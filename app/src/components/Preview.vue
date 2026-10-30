@@ -1,7 +1,5 @@
 <script setup lang="ts">
 import { computed, ref, watch, onMounted, onBeforeUnmount, nextTick } from 'vue';
-import { bindMermaidInteractions, initMermaid } from '../lib/mermaid-lazy';
-import { mermaidThemeFor } from '../lib/themes';
 import { openRenderedLink } from '../lib/link-open';
 import { renderMarkdown, extractImageRoot } from '../lib/markdown';
 import { togglePreviewTask } from '../lib/preview-task-toggle';
@@ -9,18 +7,12 @@ import { useRenderDepsVersion } from '../composables/useRenderDepsVersion';
 import { plantumlSvgUrl } from '../lib/plantuml';
 import { installSvgImageFallbacks, rewriteImageUrls } from '../lib/image-resolve';
 import { openImageOverlay, type OverlayStrings } from '../lib/image-overlay';
-import { svgToPngBlob, diagramBackground } from '../lib/mermaid-export';
-import { save as saveDialog } from '@tauri-apps/plugin-dialog';
-import { documentDir, join } from '@tauri-apps/api/path';
-import { invoke } from '@tauri-apps/api/core';
-import { isIOS } from '../lib/platform';
 import { useToastsStore } from '../stores/toasts';
 import { useI18n } from '../i18n';
 import { useSettingsStore } from '../stores/settings';
 import { useTabsStore } from '../stores/tabs';
 import PreviewSearch from './PreviewSearch.vue';
 import { attachCodeCopyButtons as attachSharedCodeCopyButtons } from '../lib/code-copy';
-import { writePngToClipboard } from '../lib/image-clipboard';
 import { previewScrollMemory, tabTopLineMemory } from '../lib/scroll-memory';
 
 const props = withDefaults(
@@ -176,7 +168,6 @@ function onMathKeydown(e: KeyboardEvent) {
   else if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); saveMathEdit(); }
 }
 
-let mermaidIdSeq = 0;
 
 const renderDepsVersion = useRenderDepsVersion();
 
@@ -227,126 +218,11 @@ function processPlantuml() {
   }
 }
 
-async function processMermaid() {
-  if (!host.value) return;
-  const blocks = host.value.querySelectorAll('pre > code.language-mermaid');
-  if (!blocks.length) return;   // a note without diagrams never loads mermaid
-  const mermaid = await initMermaid({
-    startOnLoad: false,
-    securityLevel: 'strict',
-    theme: mermaidThemeFor(settings.theme),
-  });
-  for (const block of Array.from(blocks)) {
-    const pre = block.parentElement as HTMLElement | null;
-    if (!pre || pre.dataset.rendered === '1') continue;
-    const code = (block.textContent || '').trim();
-    const id = `mmd-${++mermaidIdSeq}`;
-    try {
-      const { svg, bindFunctions } = await mermaid.render(id, code);
-      const wrap = document.createElement('div');
-      wrap.className = 'mermaid-block';
-      // Keep the source so a theme switch can re-render this diagram.
-      wrap.dataset.mermaidSource = code;
-      wrap.innerHTML = svg;
-      pre.replaceWith(wrap);
-      bindMermaidInteractions(wrap, bindFunctions);
-    } catch (e) {
-      const err = document.createElement('pre');
-      err.className = 'mermaid-error';
-      err.textContent = `Mermaid error: ${(e as Error).message}`;
-      pre.replaceWith(err);
-    }
-  }
-}
-
-// v4.6 F7 — render ```tldraw fences as static board thumbnails in the preview.
-// The fence body is a TLStoreSnapshot; we ask the runtime adapter (dynamic
-// import) to export it to a printable SVG so non-editing surfaces stay light.
-// The board class survives markdown-it as `code.language-tldraw`.
-async function processWhiteboards() {
-  if (!host.value) return;
-  const blocks = host.value.querySelectorAll('pre > code.language-tldraw');
-  if (blocks.length === 0) return;
-  const { boardToSvg } = await import('../lib/tldraw-runtime');
-  // Parse the source fences once so each preview block can recover its stable
-  // boardId/snapshot for the click-to-fullscreen affordance. markdown-it drops
-  // the fence attributes (id/height), so we match preview blocks to source
-  // fences positionally (same document order).
-  const { findTldrawFences } = await import('../lib/tldraw-board');
-  const fences = findTldrawFences(props.source || '');
-  const theme = {
-    colorScheme: (settings.theme === 'dark' ? 'dark' : 'light') as 'dark' | 'light',
-    locale: settings.language || 'en',
-  };
-  const list = Array.from(blocks);
-  for (let idx = 0; idx < list.length; idx++) {
-    const block = list[idx];
-    const pre = block.parentElement as HTMLElement | null;
-    if (!pre || pre.dataset.rendered === '1') continue;
-    pre.dataset.rendered = '1';
-    const snapshot = (block.textContent || '').trim();
-    const fence = fences[idx];
-    const wrap = document.createElement('div');
-    wrap.className = 'whiteboard-block';
-    const makeEditable = (svg: string) => {
-      wrap.innerHTML = svg;
-      // Only the editor preview can write back — read-only skins (slideshow,
-      // export) omit tabId, so the thumbnail stays a static image there.
-      if (fence && props.tabId) {
-        wrap.classList.add('whiteboard-block--clickable');
-        wrap.setAttribute('role', 'button');
-        wrap.setAttribute('tabindex', '0');
-        wrap.title = t('whiteboard.openFull');
-        const openFull = () => {
-          window.dispatchEvent(
-            new CustomEvent('solomd:whiteboard-open', {
-              detail: { boardId: fence.boardId, tabId: props.tabId, snapshot: fence.snapshot },
-            }),
-          );
-        };
-        wrap.addEventListener('click', openFull);
-        wrap.addEventListener('keydown', (ev) => {
-          if (ev.key === 'Enter' || ev.key === ' ') {
-            ev.preventDefault();
-            openFull();
-          }
-        });
-      }
-    };
-    try {
-      const svg = await boardToSvg(snapshot, theme);
-      if (svg) {
-        makeEditable(svg);
-      } else {
-        wrap.classList.add('whiteboard-block--empty');
-        wrap.textContent = t('whiteboard.empty');
-      }
-      pre.replaceWith(wrap);
-    } catch {
-      wrap.classList.add('whiteboard-block--empty');
-      wrap.textContent = t('whiteboard.loadFailed');
-      pre.replaceWith(wrap);
-    }
-  }
-}
 
 // The theme is applied by processMermaid on each render pass. Diagrams already
 // on screen were drawn for the old theme and processMermaid skips them, so put
 // their source back as a fence first and let it render them again (#354).
 // A note with no diagrams still never loads the renderer.
-watch(() => settings.theme, () => {
-  if (host.value) {
-    for (const wrap of Array.from(host.value.querySelectorAll<HTMLElement>('.mermaid-block[data-mermaid-source]'))) {
-      const pre = document.createElement('pre');
-      const code = document.createElement('code');
-      code.className = 'language-mermaid';
-      code.textContent = wrap.dataset.mermaidSource ?? '';
-      pre.appendChild(code);
-      wrap.replaceWith(pre);
-    }
-  }
-  void processMermaid();
-});
 
 function overlayStrings(): OverlayStrings {
   return {
@@ -378,84 +254,14 @@ function attachImageOverlayHandlers() {
       });
     });
   }
-
-  const blocks = host.value.querySelectorAll('.mermaid-block');
-  for (const block of Array.from(blocks)) {
-    if ((block as HTMLElement).dataset.overlayBound === '1') continue;
-    (block as HTMLElement).dataset.overlayBound = '1';
-    block.addEventListener('click', ((e: MouseEvent) => {
-      // #462 — Let clicks on embedded links inside a Mermaid diagram pass
-      // through to `handleLinkClick` instead of opening the zoom overlay.
-      if ((e.target as Element | null)?.closest?.('a')) return;
-      e.stopPropagation();
-      e.preventDefault();
-      const svg = block.querySelector('svg');
-      if (!svg) return;
-      openImageOverlay({
-        source: svg,
-        strings: overlayStrings(),
-        // #162 — Mermaid renders as inline SVG, so the WebView's own
-        // "save image as" only offers HTML; give diagrams real PNG actions.
-        actions: [
-          { label: t('overlay.exportPng'), onClick: () => exportDiagramPng(svg) },
-          { label: t('overlay.copyImage'), onClick: () => copyDiagramPng(svg) },
-        ],
-      });
-    }) as EventListener);
-  }
 }
 
-// #195 — fenced code blocks get a stable, one-click copy affordance. The
-// implementation lives in lib/code-copy.ts so the live-edit editor and the
-// Windows plain-block editor render the exact same button (v4.11.18).
 function attachCodeCopyButtons() {
   if (!host.value) return;
   attachSharedCodeCopyButtons(host.value, {
     label: t('toolbar.copy'),
     onError: (err) => useToastsStore().error(`Copy failed: ${err}`),
   });
-}
-
-// ── #162: single-diagram PNG export / copy ──────────────────────────
-
-function diagramExportName(): string {
-  const base = props.filePath?.split(/[\\/]/).pop()?.replace(/\.[^.]+$/, '');
-  return base ? `${base}-diagram.png` : 'diagram.png';
-}
-
-async function exportDiagramPng(svg: SVGElement) {
-  const toasts = useToastsStore();
-  try {
-    const blob = await svgToPngBlob(svg, { scale: 2, background: diagramBackground() });
-    const filename = diagramExportName();
-    const path = isIOS()
-      ? await join(await documentDir(), filename)
-      : await saveDialog({
-          defaultPath: filename,
-          filters: [{ name: 'PNG Image', extensions: ['png'] }],
-        });
-    if (!path) return;
-    const buffer = new Uint8Array(await blob.arrayBuffer());
-    await invoke('write_binary_file', { path, data: Array.from(buffer) });
-    toasts.success(
-      isIOS() ? t('toast.savedToIos', { name: filename }) : `Saved ${path.split(/[\\/]/).pop()}`,
-    );
-  } catch (err) {
-    toasts.error(`Export failed: ${err}`);
-  }
-}
-
-async function copyDiagramPng(svg: SVGElement) {
-  const toasts = useToastsStore();
-  try {
-    const blob = await svgToPngBlob(svg, { scale: 2, background: diagramBackground() });
-    // Shared with the editor's "Copy image" (#362): Tauri plugin first, then
-    // the browser Clipboard API.
-    await writePngToClipboard(blob);
-    toasts.success(t('overlay.copyImage') + ' ✓');
-  } catch (err) {
-    toasts.error(`Copy failed: ${err}`);
-  }
 }
 
 // #456 / #406 — Remember per-tab reading scroll offset in Preview / Reading
@@ -526,8 +332,6 @@ watch(html, async () => {
     restoreTabScroll(activeTabId);
   }
   processPlantuml();
-  await processMermaid();
-  await processWhiteboards();
   attachImageOverlayHandlers();
   attachCodeCopyButtons();
   enableTaskCheckboxes();
@@ -544,8 +348,6 @@ watch(
     host.value.innerHTML = html.value;
     await nextTick();
     processPlantuml();
-    await processMermaid();
-    await processWhiteboards();
     attachImageOverlayHandlers();
     attachCodeCopyButtons();
     enableTaskCheckboxes();
@@ -570,8 +372,6 @@ onMounted(async () => {
     restoreTabScroll(props.tabId);
   }
   processPlantuml();
-  await processMermaid();
-  await processWhiteboards();
   attachImageOverlayHandlers();
   attachCodeCopyButtons();
   enableTaskCheckboxes();

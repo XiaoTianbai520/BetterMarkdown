@@ -39,21 +39,7 @@ export interface FenceLanguage {
 // that line, because "whiteboard" that cannot find tldraw is worse than no
 // hint at all.
 const SPECIAL_FENCES: FenceLanguage[] = [
-  {
-    name: 'mermaid',
-    aliases: [],
-    hint: 'diagram',
-    special: true,
-    keywords: ['diagram', 'flowchart', 'sequence', 'gantt', 'chart', 'class'],
-  },
-  {
-    name: 'tldraw',
-    aliases: [],
-    hint: 'whiteboard',
-    special: true,
-    keywords: ['whiteboard', 'board', 'draw', 'canvas', 'sketch'],
-  },
-  {
+      {
     name: 'plantuml',
     aliases: ['puml'],
     hint: 'UML',

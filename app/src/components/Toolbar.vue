@@ -8,7 +8,6 @@ import { useSettingsStore } from '../stores/settings';
 import { useWorkspaceStore } from '../stores/workspace';
 import { useTilesStore } from '../stores/tiles';
 import { track } from '../lib/telemetry';
-import { getPlainSelection } from '../lib/plain-selection';
 import { useFiles } from '../composables/useFiles';
 import { useViewport } from '../composables/useViewport';
 import { shortcutLabel } from '../lib/keybindings';
@@ -29,9 +28,6 @@ import { macTitleBar, winTitleBar, customTitleBar } from '../lib/chrome';
 import { displayTabTitle } from '../lib/tab-title';
 
 const hasTauriShell = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
-import { IS_APP_STORE_BUILD } from '../lib/app-build';
-import { MERMAID_INSERT_SNIPPET } from '../lib/insert-snippet';
-import { EditorView } from '@codemirror/view';
 
 const { t } = useI18n();
 
@@ -119,13 +115,6 @@ function onTitleBarDblClick(e: MouseEvent) {
   void getCurrentWindow().toggleMaximize();
 }
 
-/**
- * v2.5 F6 — open the CJK proofread panel. App.vue listens for this
- * event (same pattern as `solomd:open-help` / `solomd:open-settings`).
- */
-function onOpenCjkProofread() {
-  window.dispatchEvent(new CustomEvent('solomd:open-cjk-proofread'));
-}
 
 function onCleanAI() {
   const tab = tabs.activeTab;
@@ -147,75 +136,7 @@ function onCleanAI() {
  * builders the same `solomd:ai-rewrite-open` event off the active editor's
  * selection so both routes funnel into AIRewriteOverlay.
  */
-function onAIRewrite() {
-  if (!tabs.activeTab) {
-    toasts.warning(t('toast.noActiveDoc'));
-    return;
-  }
-  if (!settings.aiEnabled) {
-    toasts.info(t('toast.enableAiFirst'));
-    // AI settings live under the `integrations` category in
-    // SettingsPanel; pass section via event detail so the panel jumps
-    // there directly instead of opening at the default `basics` tab.
-    window.dispatchEvent(
-      new CustomEvent('solomd:open-settings', { detail: { section: 'integrations' } }),
-    );
-    return;
-  }
-  // Read selection from the focused CodeMirror view. We REFUSE to fall back
-  // to the whole document — silently translating the entire file is almost
-  // never what the user wants, and the overlay's accept path replaces using
-  // the editor's current selection anyway, so a "whole doc" toolbar fire
-  // would either replace the whole doc on accept (data loss surprise) or
-  // splice the translation at the cursor (also surprising). Force explicit
-  // selection.
-  //
-  // #95 fix: don't require .cm-focused. The user's complaint was that
-  // after closing the rewrite overlay and clicking the toolbar button
-  // again, "Select some text first" fired even though the selection
-  // box was clearly still visible. The overlay's close path returns
-  // focus to the editor on the next tick, so by the time the button
-  // click event reaches this handler the .cm-focused class is briefly
-  // absent — but the DOM Selection is unchanged. Accept any .cm-editor
-  // on the page; the selection check below is what matters.
-  // Read the selection from CodeMirror's state — NOT window.getSelection().
-  // On Windows WebView2 the DOM Selection comes back empty for the CM editor
-  // (its drawSelection-managed selection isn't exposed via getSelection), so
-  // the old read made AI rewrite wrongly report "Select some text first" even
-  // with text selected. CM state is the source of truth and matches the ⌘J
-  // path (cm-ai-rewrite.ts dispatchOpen). Also lets us pass the real from/to
-  // instead of 0/0.
-  const editors = [
-    document.querySelector<HTMLElement>('.cm-editor.cm-focused'),
-    ...Array.from(document.querySelectorAll<HTMLElement>('.cm-editor')),
-  ].filter((e): e is HTMLElement => e != null);
-  let picked: { selection: string; from: number; to: number } | null = null;
-  for (const el of editors) {
-    const view = EditorView.findFromDOM(el);
-    if (!view) continue;
-    const main = view.state.selection.main;
-    if (main.empty) continue;
-    const text = view.state.sliceDoc(main.from, main.to);
-    if (text.trim()) {
-      picked = { selection: text, from: main.from, to: main.to };
-      break;
-    }
-  }
-  // #126 — Windows has NO CodeMirror view since the 4.6.4 plain-editor swap,
-  // so the scan above finds nothing there; ask the plain editor's selection
-  // registry before giving up (textareas keep selectionStart/End on blur).
-  if (!picked) {
-    picked = getPlainSelection();
-  }
-  if (!picked) {
-    const jChord = shortcutLabel('editor.aiRewrite', settings.keybindings, usesCommandKey()) || '—';
-    toasts.info(t('toast.selectTextForAi', { chord: jChord }));
-    return;
-  }
-  window.dispatchEvent(
-    new CustomEvent('solomd:ai-rewrite-open', { detail: picked }),
-  );
-}
+function onAIRewrite() {}
 
 async function onOpenExternal() {
   const path = tabs.activeTab?.filePath;
@@ -291,7 +212,7 @@ function goMorePage(p: MorePage) {
 
 /** AI rewrite exists in this build and is switched on — otherwise the AI
  *  control is just "clean AI artifacts" (see the template). */
-const aiRewriteAvailable = computed(() => !IS_APP_STORE_BUILD && settings.aiEnabled);
+const aiRewriteAvailable = computed(() => false);
 
 type ViewModeId = 'edit' | 'split' | 'liveEdit' | 'preview' | 'reading';
 /** The header's segmented switch: the four modes people move between while
@@ -962,10 +883,7 @@ onBeforeUnmount(() => {
             <button class="dropdown__item dropdown__item--single" role="menuitem" tabindex="-1" @mousedown.prevent="act(() => exporter.exportHtml())">
               <span class="dropdown__name">{{ t('toolbar.exportHtml') }}</span>
             </button>
-            <button class="dropdown__item dropdown__item--single" role="menuitem" tabindex="-1" @mousedown.prevent="act(() => exporter.exportDocx())">
-              <span class="dropdown__name">{{ t('toolbar.exportDocx') }}</span>
-            </button>
-            <!-- Gitee IK8QJQ — the two PDF paths differ (vector text via the
+                        <!-- Gitee IK8QJQ — the two PDF paths differ (vector text via the
                  OS print engine vs. a rasterised file with no dialog); say so. -->
             <button class="dropdown__item" role="menuitem" tabindex="-1" @mousedown.prevent="act(() => exporter.exportPdfPrint())">
               <span class="dropdown__row">
@@ -974,14 +892,7 @@ onBeforeUnmount(() => {
               </span>
               <span class="dropdown__path">{{ t('toolbar.exportPdfPrintHint') }}</span>
             </button>
-            <button class="dropdown__item" role="menuitem" tabindex="-1" @mousedown.prevent="act(() => exporter.exportPdf())">
-              <span class="dropdown__name">{{ t('toolbar.exportPdf') }}</span>
-              <span class="dropdown__path">{{ t('toolbar.exportPdfHint') }}</span>
-            </button>
-            <button class="dropdown__item dropdown__item--single" role="menuitem" tabindex="-1" @mousedown.prevent="act(() => exporter.exportImage())">
-              <span class="dropdown__name">{{ t('toolbar.exportImage') }}</span>
-            </button>
-            <div class="dropdown__sep"></div>
+                                    <div class="dropdown__sep"></div>
             <button class="dropdown__item dropdown__item--single" role="menuitem" tabindex="-1" @mousedown.prevent="act(() => exporter.copyAsHtml())">
               <span class="dropdown__name">{{ t('toolbar.copyHtml') }}</span>
               <span v-if="chord('export.copyHtml')" class="dropdown__shortcut">{{ chord('export.copyHtml') }}</span>
@@ -1189,20 +1100,7 @@ onBeforeUnmount(() => {
                 <span class="dropdown__check">{{ settings.spellCheck ? '✓' : '' }}</span>
                 <span class="dropdown__name">{{ t('menubar.spellCheck') }}</span>
               </button>
-              <button
-                v-if="isMarkdown"
-                class="dropdown__item dropdown__item--single"
-                :class="{ 'dropdown__item--disabled': settings.viewMode === 'preview' }"
-                role="menuitem"
-                tabindex="-1"
-                :disabled="settings.viewMode === 'preview'"
-                @mousedown.prevent="act(onOpenCjkProofread)"
-              >
-                <span class="dropdown__check"></span>
-                <span class="dropdown__name">{{ t('proofread.heading') }}</span>
-                <span v-if="chord('proofread.cjk')" class="dropdown__shortcut">{{ chord('proofread.cjk') }}</span>
-              </button>
-              <div class="dropdown__sep"></div>
+                            <div class="dropdown__sep"></div>
               <button class="dropdown__item dropdown__item--single" role="menuitem" tabindex="-1" @mousedown.prevent="act(onOpenExternal)">
                 <span class="dropdown__check"></span>
                 <span class="dropdown__name">{{ isIOS() ? t('header.share') : t('header.openExternal') }}</span>
@@ -1268,10 +1166,6 @@ onBeforeUnmount(() => {
                 <span class="dropdown__check"></span>
                 <span class="dropdown__name">{{ t('toolbar.insertTable') }}</span>
               </button>
-              <button class="dropdown__item dropdown__item--single" role="menuitem" tabindex="-1" @mousedown.prevent="dispatchInsert(MERMAID_INSERT_SNIPPET)">
-                <span class="dropdown__check"></span>
-                <span class="dropdown__name">{{ t('toolbar.insertMermaid') }}</span>
-              </button>
               <div class="dropdown__sep"></div>
               <button class="dropdown__item dropdown__item--single" role="menuitem" tabindex="-1" @mousedown.prevent="dispatchFormat('link')">
                 <span class="dropdown__check"></span>
@@ -1328,12 +1222,7 @@ onBeforeUnmount(() => {
             </template>
 
             <template v-if="morePage === 'ai'">
-              <button class="dropdown__item dropdown__item--single" role="menuitem" tabindex="-1" @mousedown.prevent="act(onAIRewrite)">
-                <span class="dropdown__check"></span>
-                <span class="dropdown__name">{{ t('cmd.editor.aiRewrite') }}</span>
-                <span v-if="chord('editor.aiRewrite')" class="dropdown__shortcut">{{ chord('editor.aiRewrite') }}</span>
-              </button>
-              <button class="dropdown__item dropdown__item--single" role="menuitem" tabindex="-1" @mousedown.prevent="act(onCleanAI)">
+                            <button class="dropdown__item dropdown__item--single" role="menuitem" tabindex="-1" @mousedown.prevent="act(onCleanAI)">
                 <span class="dropdown__check"></span>
                 <span class="dropdown__name">{{ t('toolbar.cleanAiMarks') }}</span>
               </button>

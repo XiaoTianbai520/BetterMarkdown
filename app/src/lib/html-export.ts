@@ -9,7 +9,6 @@
  */
 import { renderMarkdown, extractImageRoot } from './markdown';
 import { inlineLocalImages, rewriteLinkUrls, rewriteImageUrls, type BinaryReader } from './image-resolve';
-import { inlineDiagramsInHtml } from './diagram-export';
 import { hasKatex, standaloneKatexCss } from './katex-standalone';
 import { loadRenderDeps } from './render-deps';
 import { buildExportCustomCss, getActiveCustomCss } from './custom-theme';
@@ -262,9 +261,7 @@ export async function buildStandaloneHtml(input: StandaloneHtmlInput): Promise<s
   );
   // #332 — diagrams become inline SVG, so the page shows them offline
   // instead of the fence source.
-  const withDiagrams = await inlineDiagramsInHtml(withImages, {
-    plantumlServer: input.plantumlServer,
-  });
+  const withDiagrams = withImages;
   // v4.3.0 issue #77 — local-file `href` / `src` URLs become absolute
   // `file://` paths so the export doesn't bake in `http://tauri.localhost/...`.
   const body = rewriteLinkUrls(

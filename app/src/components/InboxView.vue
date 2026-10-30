@@ -78,7 +78,7 @@ const canOrganize = computed(() => inbox.activeIsInbox.value);
  *  vault actually uses (status, type, tags…). */
 const chipColumns = computed<ColumnDef[]>(() =>
   inferColumns(idx.entries)
-    .filter((c) => c.source === 'frontmatter' && c.fmKey !== 'inbox')
+    .filter((c: ColumnDef) => c.source === 'frontmatter' && c.fmKey !== 'inbox')
     .slice(0, 2),
 );
 

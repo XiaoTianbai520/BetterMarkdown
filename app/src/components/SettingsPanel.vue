@@ -34,25 +34,10 @@ import { isMasBuild } from '../lib/check-update';
 import { useUpdateCheck } from '../composables/useUpdateCheck';
 import { IS_APP_STORE_BUILD } from '../lib/app-build';
 import { useFiles } from '../composables/useFiles';
-import AISettings from './AISettings.vue';
-import CitationPickerSettings from './CitationPickerSettings.vue';
-import CaptureEndpointSettings from './CaptureEndpointSettings.vue';
-import RestApiSettings from './RestApiSettings.vue';
-import CostMeterSettings from './CostMeterSettings.vue';
-import IntegrationsSettings from './IntegrationsSettings.vue';
 // v4.0 Pillar 2 — Agent Recipes panel. Mounted under the existing
 // "Integrations" category so users find Recipes alongside CLI / MCP /
 // AI rewrite — i.e. the cluster of "things SoloMD talks to" rather
 // than a brand-new top-level category.
-import RecipesSettings from './RecipesSettings.vue';
-import GithubSyncSettings from './GithubSyncSettings.vue';
-import WebdavSyncSettings from './WebdavSyncSettings.vue';
-import CloudFolderBanner from './CloudFolderBanner.vue';
-import ProxySettings from './ProxySettings.vue';
-import LanguageToolSettings from './LanguageToolSettings.vue';
-import ThemeMarketplace from './ThemeMarketplace.vue';
-import SupportDialog from './SupportDialog.vue';
-import { supporterRecord, badgeInfo, initSupporterState } from '../lib/supporter';
 import { isIOS, isMobile, hasGitBackend, isWindowsEditorRuntime, resolveWindowsEditorEngine } from '../lib/platform';
 import type { WindowsEditorEngine } from '../lib/platform';
 import { loadCustomTheme } from '../lib/custom-theme';
@@ -82,11 +67,8 @@ const autoEngineName = computed(() =>
     : t('settings.windowsEditorEngineNameNative'),
 );
 
-const { t, lang } = useI18n();
-const supportModalOpen = ref(false);
-const isZhLocale = computed(() => String(lang.value || '').startsWith('zh'));
-const activeSupporterBadge = computed(() => badgeInfo(supporterRecord.value.active, isZhLocale.value));
-void initSupporterState();
+const { t } = useI18n();
+// supportModalOpen removed
 // #180 — the chord in this sentence comes from the user's bindings, not from
 // a literal baked into the translation.
 const macChord = usesCommandKey();
@@ -795,10 +777,6 @@ async function refreshCustomCss() {
 }
 
 // v2.5: theme marketplace modal — opened from the Custom CSS section.
-const themeMarketplaceOpen = ref(false);
-function openThemeMarketplace() {
-  themeMarketplaceOpen.value = true;
-}
 
 const baseFontFamilies = [
   // Monospace — for code-heavy editing
@@ -990,21 +968,6 @@ function onSelectPdfFont(v: string) {
             <Icons class="settings__nav-icon" :name="c.icon" :size="16" />
             <span class="settings__nav-label">{{ t(c.labelKey) }}</span>
           </button>
-          <button
-            type="button"
-            class="settings__nav-item settings__nav-supporter"
-            :class="{ 'settings__nav-supporter--active': Boolean(activeSupporterBadge) }"
-            @click="supportModalOpen = true"
-          >
-            <Icons class="settings__nav-icon" name="heart" :size="16" />
-            <span class="settings__nav-label">
-              {{
-                activeSupporterBadge
-                  ? `${activeSupporterBadge.icon} ${activeSupporterBadge.label}`
-                  : t('about.sponsor')
-              }}
-            </span>
-          </button>
         </nav>
       <div
         ref="bodyEl"
@@ -1029,23 +992,9 @@ function onSelectPdfFont(v: string) {
           <label>{{ t('settings.language') }}</label>
           <select
             :value="settings.language"
-            @change="settings.setLanguage(($event.target as HTMLSelectElement).value as 'en' | 'zh' | 'ja' | 'ko' | 'de' | 'fr' | 'es' | 'pt' | 'it' | 'pl' | 'nl' | 'tr' | 'sv' | 'uk' | 'ru')"
-          >
+            @change="settings.setLanguage(($event.target as HTMLSelectElement).value as 'en' | 'zh')">
             <option value="en">English</option>
             <option value="zh">中文</option>
-            <option value="ja">日本語</option>
-            <option value="ko">한국어</option>
-            <option value="de">Deutsch</option>
-            <option value="fr">Français</option>
-            <option value="es">Español</option>
-            <option value="pt">Português</option>
-            <option value="it">Italiano</option>
-            <option value="pl">Polski</option>
-            <option value="nl">Nederlands</option>
-            <option value="tr">Türkçe</option>
-            <option value="sv">Svenska</option>
-            <option value="uk">Українська</option>
-            <option value="ru">Русский</option>
           </select>
         </section>
 
@@ -1562,20 +1511,16 @@ function onSelectPdfFont(v: string) {
 
         <!-- v2.6.1 cloud-folder banner. Self-hides if the workspace isn't
              inside a known cloud-sync folder. -->
-        <div v-if="gitBackend" data-cat="sync"><CloudFolderBanner /></div>
-
+        
         <!-- v2.6 GitHub sync — sits right under AutoGit since it pushes the
              same commits AutoGit produces; reads top-down as one story. -->
-        <div v-if="gitBackend" data-cat="sync"><GithubSyncSettings /></div>
-
+        
         <!-- #458 — WebDAV workspace sync (Nextcloud /堅果云 / Synology / ownCloud). -->
-        <div data-cat="sync"><WebdavSyncSettings /></div>
-
+        
         <!-- v3.0 — proxy URL (network-level, applies to libgit2 push/pull
              across GitHub / GitLab / Gitea). Pulled out of GithubSyncSettings
              so users hitting timeouts find it at the top of the Sync tab. -->
-        <div v-if="gitBackend" data-cat="sync"><ProxySettings /></div>
-
+        
         <section data-cat="writing">
           <label>
             <input type="checkbox" :checked="settings.spellcheckEnabled" @change="settings.toggleSpellcheckEnabled()" />
@@ -1605,8 +1550,7 @@ function onSelectPdfFont(v: string) {
 
         <!-- LanguageTool grammar / style checking — right under Hunspell,
              which steps back while LanguageTool handles spelling. -->
-        <div data-cat="writing"><LanguageToolSettings /></div>
-
+        
         <section data-cat="integrations">
           <h3 class="settings__group-title">
             {{ t('rag.settingsHeading') }}
@@ -2183,33 +2127,19 @@ function onSelectPdfFont(v: string) {
           />
         </section>
 
-        <div data-cat="export"><CitationPickerSettings /></div>
-
+        
         <!-- App Store builds strip the AI / Agent / Recipes / CostMeter
              surface under Guideline 3.1.1 (BYOK API keys unlocking paid
              functionality). The GitHub Developer ID build keeps them. -->
-        <div v-if="!IS_APP_STORE_BUILD" data-cat="integrations"><AISettings
-          :enabled="settings.aiEnabled"
-          :provider="(settings.aiProvider as any)"
-          :model="settings.aiModel"
-          :base-url="settings.aiBaseUrl"
-          @update:enabled="settings.toggleAiEnabled()"
-          @update:provider="(v: string) => settings.setAiProvider(v)"
-          @update:model="(v: string) => settings.setAiModel(v)"
-          @update:baseUrl="(v: string) => settings.setAiBaseUrl(v)"
-        /></div>
-
+        
         <!-- v4.0: BYOK cost meter — sits under AI so users see "your spend"
              right below "your provider key". -->
-        <div v-if="!IS_APP_STORE_BUILD" data-cat="integrations"><CostMeterSettings /></div>
-
+        
         <!-- v2.4: Integrations (CLI + MCP). -->
-        <div data-cat="integrations"><IntegrationsSettings /></div>
-
+        
         <!-- v4.0 Pillar 2: Agent Recipes. -->
         <!-- #230 — recipe_runner is desktop/iOS only (git-backed receipts). -->
-        <div v-if="!IS_APP_STORE_BUILD && gitBackend" data-cat="integrations"><RecipesSettings /></div>
-
+        
         <section data-cat="writing">
           <label>
             <input type="checkbox" :checked="settings.spellCheck" @change="settings.toggleSpellCheck()" />
@@ -2448,8 +2378,7 @@ function onSelectPdfFont(v: string) {
           <label>{{ t('settings.customCss') }}</label>
           <div class="row" style="gap: 8px; align-items: center; flex-wrap: wrap;">
             <button @click="pickCustomCss">{{ t('settings.pickCss') }}</button>
-            <button @click="openThemeMarketplace">{{ t('themes.browseBtn') }}</button>
-            <button v-if="!IS_APP_STORE_BUILD && !isMobile" type="button" @click="invoke('open_devtools_window').catch(() => {})">DevTools (F12)</button>
+                        <button v-if="!IS_APP_STORE_BUILD && !isMobile" type="button" @click="invoke('open_devtools_window').catch(() => {})">DevTools (F12)</button>
             <button v-if="settings.customCssPath" @click="settings.setCustomCssPath('')">{{ t('settings.clear') }}</button>
           </div>
           <div v-if="settings.customCssPath" class="css-path-row" style="font-size: 11px; color: var(--text-faint); word-break: break-all; margin-top: 4px;">
@@ -2481,24 +2410,14 @@ function onSelectPdfFont(v: string) {
         </section>
 
         <!-- v2.4 Integrations: HTTP capture endpoint. -->
-        <div data-cat="integrations"><CaptureEndpointSettings /></div>
-
+        
         <!-- v4.0: Public REST API for non-MCP clients. -->
-        <div data-cat="integrations"><RestApiSettings /></div>
-      </div>
+              </div>
       </div>
     <!-- v2.5: theme marketplace modal. Lives outside settings__body so it
          overlays the entire viewport; it self-teleports to body so closing
          settings (which unmounts DsModal) closes it too. -->
-    <ThemeMarketplace
-      :open="themeMarketplaceOpen"
-      @close="themeMarketplaceOpen = false"
-    />
-    <SupportDialog
-      :open="supportModalOpen"
-      @close="supportModalOpen = false"
-    />
-  </DsModal>
+          </DsModal>
 </template>
 
 <style scoped>

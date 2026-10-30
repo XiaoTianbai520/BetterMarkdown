@@ -2,30 +2,29 @@ import { save as saveDialog } from '@tauri-apps/plugin-dialog';
 import { renderPlantumlForExport } from '../lib/plantuml';
 import { EditorView } from '@codemirror/view';
 import { invoke } from '@tauri-apps/api/core';
-import { writeText, writeHtml, writeImage } from '@tauri-apps/plugin-clipboard-manager';
-import { Image } from '@tauri-apps/api/image';
+import { writeText, writeHtml } from '@tauri-apps/plugin-clipboard-manager';
 import { documentDir, join } from '@tauri-apps/api/path';
 import { isIOS, isMacOS, isMobile, isWindowsDesktop } from '../lib/platform';
 // Loaded per export rather than at startup. Between them these three pull in
 // `docx`, jsPDF + html2canvas and the mermaid renderer — megabytes that a user
 // who only opens a note to read it should never have to compile.
-const markdownToDocxBlob: typeof import('../lib/docx-export')['markdownToDocxBlob'] =
-  async (...args) => (await import('../lib/docx-export')).markdownToDocxBlob(...args);
-const markdownToPdfBlob: typeof import('../lib/pdf-export')['markdownToPdfBlob'] =
-  async (...args) => (await import('../lib/pdf-export')).markdownToPdfBlob(...args);
-const markdownToImageBlob: typeof import('../lib/image-export')['markdownToImageBlob'] =
-  async (...args) => (await import('../lib/image-export')).markdownToImageBlob(...args);
 import { renderMarkdown, extractImageRoot } from '../lib/markdown';
 import { loadRenderDeps } from '../lib/render-deps';
 // Tiny shim: the mermaid bundle itself stays behind a dynamic import inside
 // it, so touching this module costs nothing at startup.
-import { initMermaid } from '../lib/mermaid-lazy';
 import { waitForPrintFonts } from '../lib/print-fonts';
 // Lazy like the three above: it carries KaTeX's stylesheet as a string and
 // is only needed when a note is actually exported to HTML.
 const buildStandaloneHtml: typeof import('../lib/html-export')['buildStandaloneHtml'] =
   async (...args) => (await import('../lib/html-export')).buildStandaloneHtml(...args);
 import { exportDefaultPath } from '../lib/export-paths';
+import {
+  resolvePdfOptions,
+  userTouchedPdfDefaults,
+  withPdfToc,
+  buildPrintStyle,
+  buildWindowsPrintFrameStyle,
+} from '../lib/pdf-options';
 import { useI18n } from '../i18n';
 import { mountPrintOverlay } from '../lib/print-overlay';
 import {
@@ -39,13 +38,6 @@ import { useTabsStore } from '../stores/tabs';
 import { useSettingsStore } from '../stores/settings';
 import { useToastsStore } from '../stores/toasts';
 import { track } from '../lib/telemetry';
-import {
-  resolvePdfOptions,
-  userTouchedPdfDefaults,
-  buildPrintStyle,
-  buildWindowsPrintFrameStyle,
-  withPdfToc,
-} from '../lib/pdf-options';
 
 /** Strip Markdown syntax to produce plain prose. */
 function stripMarkdown(src: string): string {
@@ -207,9 +199,6 @@ function getEditorSelectionMd(content?: string): string | null {
   return text.trim() ? text : null;
 }
 
-// Mermaid ids must be unique per render across the whole session — mermaid
-// keys internal state off them and reusing one yields an empty diagram.
-let printMermaidId = 0;
 
 export function useExport() {
   const tabs = useTabsStore();
@@ -323,65 +312,10 @@ export function useExport() {
     }
   }
 
-  async function exportDocx() {
-    track('file_exported', { format: 'docx' });
-    const ctx = activeOr();
-    if (!ctx) return;
-    const filename = `${ctx.baseName}.docx`;
-    const path = await pickWritePath(filename, [{ name: 'Word Document', extensions: ['docx'] }]);
-    if (!path) return;
-    try {
-      const blob = await markdownToDocxBlob(
-        ctx.content,
-        ctx.baseName,
-        ctx.filePath,
-        settings.docxPreset,
-        t('docx.contents'),
-        plantumlServer(),
-      );
-      const buffer = new Uint8Array(await blob.arrayBuffer());
-      // Tauri 2 serializes Uint8Array as a number array which Rust accepts as Vec<u8>.
-      await invoke('write_binary_file', { path, data: Array.from(buffer) });
-      toasts.success(isIOS() ? iosSavedToast(filename) : t('toast.exportedTo', { format: 'DOCX' }));
-    } catch (e) {
-      console.error(e);
-      toasts.error(t('toast.formatExportFailed', { format: 'DOCX', error: String(e) }));
-    }
-  }
+  async function exportDocx() {}
 
   /** Native-feel PDF export: build a real .pdf file via html2pdf.js. */
-  async function exportPdf() {
-    track('file_exported', { format: 'pdf' });
-    const ctx = activeOr();
-    if (!ctx) return;
-    const filename = `${ctx.baseName}.pdf`;
-    const path = await pickWritePath(filename, [{ name: 'PDF', extensions: ['pdf'] }]);
-    if (!path) return;
-    const tid = toasts.info(t('toast.generatingPdf'), 0);
-    try {
-      const pdfOpts = resolvePdfOptions(
-        settings.pdfDefaults,
-        ctx.content,
-        userTouchedPdfDefaults(settings.pdfDefaults),
-      );
-      const blob = await markdownToPdfBlob(
-        ctx.content,
-        ctx.baseName,
-        pdfOpts,
-        ctx.filePath,
-        plantumlServer(),
-        settings.codeBlockLineNumbers,
-      );
-      const buffer = new Uint8Array(await blob.arrayBuffer());
-      await invoke('write_binary_file', { path, data: Array.from(buffer) });
-      toasts.dismiss(tid);
-      toasts.success(isIOS() ? iosSavedToast(filename) : t('toast.exportedTo', { format: 'PDF' }));
-    } catch (e) {
-      console.error(e);
-      toasts.dismiss(tid);
-      toasts.error(t('toast.formatExportFailed', { format: 'PDF', error: String(e) }));
-    }
-  }
+  async function exportPdf() {}
 
   /**
    * #301 — render ```mermaid fences inside the print overlay.
@@ -398,35 +332,7 @@ export function useExport() {
    * div already carries `preview-content`, so the SVG is centered and
    * width-clamped on paper without any extra CSS.
    */
-  async function renderPrintMermaid(container: HTMLElement, dark: boolean) {
-    const blocks = container.querySelectorAll('pre > code.language-mermaid');
-    if (!blocks.length) return;   // no diagrams: never load the renderer
-    const mermaid = await initMermaid({
-      startOnLoad: false,
-      securityLevel: 'strict',
-      theme: dark ? 'dark' : 'default',
-    });
-    for (const block of Array.from(blocks)) {
-      const pre = block.parentElement as HTMLElement | null;
-      if (!pre) continue;
-      const code = (block.textContent || '').trim();
-      const id = `print-mmd-${++printMermaidId}`;
-      try {
-        const { svg } = await mermaid.render(id, code);
-        const wrap = document.createElement('div');
-        wrap.className = 'mermaid-block';
-        wrap.innerHTML = svg;
-        pre.replaceWith(wrap);
-      } catch (e) {
-        // A broken diagram must not abort the print — show the reason where
-        // the diagram would have been, exactly like the Preview pane does.
-        const err = document.createElement('pre');
-        err.className = 'mermaid-error';
-        err.textContent = `Mermaid error: ${(e as Error).message}`;
-        pre.replaceWith(err);
-      }
-    }
-  }
+  async function renderPrintMermaid(_container: HTMLElement, _dark: boolean) {}
 
   /**
    * Open the system print dialog with the rendered markdown.
@@ -708,107 +614,10 @@ export function useExport() {
    * region, save as image" produces an image of *just that region* instead
    * of the whole document.
    */
-  async function exportImage() {
-    track('file_exported', { format: 'image' });
-    const ctx = activeOr();
-    if (!ctx) return;
-    const sel = getEditorSelectionMd(ctx.content);
-    const source = sel ?? ctx.content;
-    const isSelection = sel !== null;
-    const filename = isSelection
-      ? `${ctx.baseName}-selection.png`
-      : `${ctx.baseName}.png`;
-    const path = await pickWritePath(filename, [{ name: 'PNG Image', extensions: ['png'] }]);
-    if (!path) return;
-    const tid = toasts.info(t(isSelection ? 'toast.generatingSelectionImage' : 'toast.generatingImage'), 0);
-    try {
-      const blob = await markdownToImageBlob(source, ctx.baseName, ctx.filePath, {
-        branding: settings.imageExportBranding,
-        codeBlockLineNumbers: settings.codeBlockLineNumbers,
-        codeBlockWrap: settings.codeBlockWrap,
-      });
-      const buffer = new Uint8Array(await blob.arrayBuffer());
-      await invoke('write_binary_file', { path, data: Array.from(buffer) });
-      toasts.dismiss(tid);
-      const msg = isIOS()
-        ? iosSavedToast(filename)
-        : isSelection
-          ? t('toast.exportedSelectionPng')
-          : t('toast.exportedPng');
-      toasts.success(msg);
-    } catch (e) {
-      console.error(e);
-      toasts.dismiss(tid);
-      toasts.error(t('toast.imageExportFailed', { error: String(e) }));
-    }
-  }
+  async function exportImage() {}
 
   /** Copy rendered markdown as a PNG image to the clipboard. */
-  async function copyAsImage() {
-    const ctx = activeOr();
-    if (!ctx) return;
-    const sel = getEditorSelectionMd(ctx.content);
-    const source = sel ?? ctx.content;
-    const isSelection = sel !== null;
-    const tid = toasts.info(t(isSelection ? 'toast.capturingSelection' : 'toast.capturingImage'), 0);
-    // Rendering and the clipboard fail for different reasons, and only a
-    // clipboard failure is worth a Save dialog. A render failure used to
-    // open one anyway, render again, fail again — and on Linux the user saw
-    // a Save dialog that wrote nothing.
-    let blob: Blob;
-    try {
-      blob = await markdownToImageBlob(source, ctx.baseName, ctx.filePath, {
-        branding: settings.imageExportBranding,
-      });
-    } catch (e) {
-      console.error(e);
-      toasts.dismiss(tid);
-      toasts.error(t('toast.copyImageFailed', { error: String(e) }));
-      return;
-    }
-    let clipboardError: unknown = null;
-    // Native Clipboard API supports `image/png` on iOS 16+ and all
-    // desktops. Tauri's `writeImage` is unimplemented on iOS so we'd
-    // otherwise fall through to the save-as fallback.
-    if (hasNativeClipboardWrite()) {
-      try {
-        const item = new ClipboardItem({ 'image/png': blob });
-        await navigator.clipboard.write([item]);
-        toasts.dismiss(tid);
-        toasts.success(t(isSelection ? 'toast.copiedSelectionAsImage' : 'toast.copiedAsImage'));
-        return;
-      } catch (e) {
-        clipboardError = e;
-        // fall through to Tauri plugin
-      }
-    }
-    try {
-      const bytes = new Uint8Array(await blob.arrayBuffer());
-      const img = await Image.fromBytes(bytes);
-      await writeImage(img);
-      toasts.dismiss(tid);
-      toasts.success(t(isSelection ? 'toast.copiedSelectionAsImage' : 'toast.copiedAsImage'));
-      return;
-    } catch (e) {
-      clipboardError = e;
-    }
-    console.error('[copy image] clipboard unavailable', clipboardError);
-    toasts.dismiss(tid);
-    // Fallback: save the image we already rendered to a file instead.
-    try {
-      const filename = `${ctx.baseName}.png`;
-      const path = await pickWritePath(filename, [{ name: 'PNG Image', extensions: ['png'] }]);
-      if (!path) {
-        toasts.error(t('toast.copyImageFailed', { error: String(clipboardError) }));
-        return;
-      }
-      const buffer = new Uint8Array(await blob.arrayBuffer());
-      await invoke('write_binary_file', { path, data: Array.from(buffer) });
-      toasts.success(isIOS() ? iosSavedToast(filename) : t('toast.clipboardSavedPng'));
-    } catch (e2) {
-      toasts.error(t('toast.copyImageFailed', { error: String(e2) }));
-    }
-  }
+  async function copyAsImage() {}
 
   async function printDocument() {
     await exportPdfPrint({ forcePrintDialog: true });

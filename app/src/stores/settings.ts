@@ -137,7 +137,7 @@ interface Settings {
    *  'native' without this flag is not a choice and becomes 'auto'. */
   windowsEditorEngineExplicit: boolean;
   uiFontSize: number;
-  language: 'en' | 'zh' | 'ja' | 'ko' | 'de' | 'fr' | 'es' | 'pt' | 'it' | 'pl' | 'nl' | 'tr' | 'sv' | 'uk' | 'ru';
+  language: 'en' | 'zh';
   autoCheckUpdate: boolean;
   // Preview layout
   previewFitWidth: boolean;
@@ -670,27 +670,12 @@ function defaults(): Settings {
     uiFontSize: 13,
     autoCheckUpdate: true,
     language: (() => {
-      // Detect browser language on first run. Maps navigator BCP-47 tag
-      // to one of the 15 shipped UI locales; everything else → 'en'.
       try {
         const nav = typeof navigator !== 'undefined' ? navigator.language || '' : '';
         if (/^zh/i.test(nav)) return 'zh';
-        if (/^ja/i.test(nav)) return 'ja';
-        if (/^ko/i.test(nav)) return 'ko';
-        if (/^de/i.test(nav)) return 'de';
-        if (/^fr/i.test(nav)) return 'fr';
-        if (/^es/i.test(nav)) return 'es';
-        if (/^pt/i.test(nav)) return 'pt';
-        if (/^it/i.test(nav)) return 'it';
-        if (/^pl/i.test(nav)) return 'pl';
-        if (/^nl/i.test(nav)) return 'nl';
-        if (/^tr/i.test(nav)) return 'tr';
-        if (/^sv/i.test(nav)) return 'sv';
-        if (/^uk/i.test(nav)) return 'uk';
-        if (/^ru/i.test(nav)) return 'ru';
         return 'en';
       } catch { return 'en'; }
-    })() as 'en' | 'zh' | 'ja' | 'ko' | 'de' | 'fr' | 'es' | 'pt' | 'it' | 'pl' | 'nl' | 'tr' | 'sv' | 'uk' | 'ru',
+    })() as 'en' | 'zh',
     previewFitWidth: false,
     previewMaxWidth: 680,
     plantumlEnabled: false,
@@ -1556,7 +1541,7 @@ export const useSettingsStore = defineStore('settings', {
       this.uiFontSize = Math.max(10, Math.min(20, n));
       this.persist();
     },
-    setLanguage(lang: 'en' | 'zh' | 'ja' | 'ko' | 'de' | 'fr' | 'es' | 'pt' | 'it' | 'pl' | 'nl' | 'tr' | 'sv' | 'uk' | 'ru') {
+    setLanguage(lang: 'en' | 'zh') {
       this.language = lang;
       this.persist();
     },

@@ -5,7 +5,6 @@ import { openUrl } from '@tauri-apps/plugin-opener';
 import { DsModal } from '../ui';
 import BrandMark from './BrandMark.vue';
 import Icons from './Icons.vue';
-import SupportDialog from './SupportDialog.vue';
 import { useI18n } from '../i18n';
 import {
   supporterRecord,
@@ -20,7 +19,6 @@ const emit = defineEmits<{ (e: 'close'): void }>();
 const { lang } = useI18n();
 const isZh = computed(() => String(lang.value || '').startsWith('zh'));
 
-const supportOpen = ref(false);
 const activeBadge = computed(() => badgeInfo(supporterRecord.value.active, isZh.value));
 
 const VERSION = ref('…');
@@ -113,7 +111,7 @@ async function visit(url: string) {
           v-if="activeBadge"
           type="button"
           class="about__supporter-badge"
-          @click="supportOpen = true"
+          @click="visit(links.sponsor)"
         >
           <span>{{ activeBadge.icon }}</span>
           <span>{{ activeBadge.label }}</span>
@@ -155,7 +153,7 @@ async function visit(url: string) {
           </div>
           <Icons class="about__link-chev" name="chevron-right" :size="14" />
         </button>
-        <button class="about__link" @click="supportOpen = true">
+        <button class="about__link" @click="visit(links.sponsor)">
           <Icons class="about__link-icon" name="heart" :size="16" />
           <div>
             <div class="about__link-title">Support / 支持开发者</div>
@@ -195,7 +193,6 @@ async function visit(url: string) {
       </div>
     </div>
   </DsModal>
-  <SupportDialog :open="supportOpen" @close="supportOpen = false" />
 </template>
 
 <style scoped>

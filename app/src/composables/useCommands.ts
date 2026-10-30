@@ -1,4 +1,3 @@
-import { createTypeRequested } from '../lib/create-type-request';
 import { FORMAT_KINDS } from '../lib/md-format';
 import { invoke } from '@tauri-apps/api/core';
 import { useFiles } from './useFiles';
@@ -9,23 +8,18 @@ import { useTabsStore } from '../stores/tabs';
 import { useTilesStore } from '../stores/tiles';
 import { useExport } from './useExport';
 import { useToastsStore } from '../stores/toasts';
-import { WebviewWindow } from '@tauri-apps/api/webviewWindow';
 import { openNewWindow } from '../lib/new-window';
 import { open as openFileDialog } from '@tauri-apps/plugin-dialog';
 import { writeText } from '@tauri-apps/plugin-clipboard-manager';
 // opencc-js + pinyin-pro are dictionaries, not code; loading them at startup
 // cost every launch for a command most users never run.
-const loadChineseConvert = () => import('../lib/chinese-convert');
-import { cleanAIArtifacts, stripMarkdownToPlain } from '../lib/clean-ai';
 import { openWelcomeTour } from '../lib/welcome-tour';
 import { formatMarkdown } from '../lib/markdown-format';
 import { openPath } from '@tauri-apps/plugin-opener';
 import { useDailyNotes } from './useDailyNotes';
 import { usePandocExport } from './usePandocExport';
-import { useBasesView } from './useBasesView';
 import { useInboxView } from './useInboxView';
 import { useInbox } from './useInbox';
-import { useSavedViews } from './useSavedViews';
 import { useAutoCommit } from './useAutoCommit';
 import { useWorkspaceIndexStore } from '../stores/workspaceIndex';
 import { useGitHistoryStore } from '../stores/gitHistory';
@@ -57,12 +51,8 @@ export function useCommands(): Command[] {
   const exporter = useExport();
   const toasts = useToastsStore();
   const daily = useDailyNotes();
-  const pandoc = usePandocExport();
-  const bases = useBasesView();
-  const inboxView = useInboxView();
-  const inbox = useInbox();
-  const savedViews = useSavedViews();
-  const auto = useAutoCommit();
+  const pandoc = usePandocExport();  const inboxView = useInboxView();
+  const inbox = useInbox();  const auto = useAutoCommit();
   const gh = useGitHistoryStore();
   const ws = useWorkspaceStore();
   const ghSync = useGithubSyncStore();
@@ -142,25 +132,7 @@ export function useCommands(): Command[] {
     return tabs.activeTab;
   }
 
-  /** Replace the active editor's content (used for the Chinese conversion commands). */
-  function transformActive(fn: (s: string) => string, successMsg: string) {
-    const t = freshActiveTab();
-    if (!t) {
-      toasts.warning('No active document');
-      return;
-    }
-    const next = fn(t.content);
-    tabs.setContent(t.id, next);
-    toasts.success(successMsg);
-  }
 
-  /** Same, for the transforms whose dictionaries are loaded on demand. */
-  async function transformActiveLazy(
-    pick: (m: typeof import('../lib/chinese-convert')) => (s: string) => string,
-    successMsg: string,
-  ) {
-    transformActive(pick(await loadChineseConvert()), successMsg);
-  }
 
   const all: Command[] = [
     { id: 'file.new', title: 'New Markdown File', shortcut: kb('file.new'), run: () => files.newFile() },
@@ -220,8 +192,7 @@ export function useCommands(): Command[] {
     { id: 'view.toggleOutline', title: 'View: Toggle Outline', shortcut: kb('view.toggleOutline'), run: () => { const tabs = useTabsStore(); if (tabs.activeId) tabs.toggleOutline(tabs.activeId); } },
     { id: 'view.toggleFileTree', title: 'View: Toggle File Tree', shortcut: kb('view.toggleFileTree'), run: () => settings.toggleFileTree() },
     { id: 'view.toggleRightSidebar', title: 'View: Toggle Right Sidebar', hint: 'Hide / show the Outline / Backlinks / Tags / History / Agent strip without losing per-pane preferences', shortcut: kb('view.toggleRightSidebar'), run: () => settings.toggleRightSidebar() },
-    { id: 'view.toggleAgentPanel', title: 'View: Toggle Agent Panel', hint: 'Right-side chat-with-vault panel — streamed multi-turn AI with tool-call cards, persisted run history, and trace replay', run: () => settings.toggleAgentPanel() },
-    { id: 'view.toggleBacklinks', title: 'View: Toggle Backlinks Pane', run: () => settings.toggleBacklinks() },
+        { id: 'view.toggleBacklinks', title: 'View: Toggle Backlinks Pane', run: () => settings.toggleBacklinks() },
     { id: 'view.relationships', title: 'View: Toggle Relationships Pane', hint: 'Typed relationships — forward edges authored in YAML front matter plus computed inverses (Referenced by)', run: () => settings.toggleRelationships() },
     { id: 'view.toggleTagsPanel', title: 'View: Toggle Tags Pane', run: () => settings.toggleTagsPanel() },
     {
@@ -231,9 +202,7 @@ export function useCommands(): Command[] {
       run: () => settings.toggleTasksPanel(),
     },
     { id: 'view.toggleNeighborhood', title: 'View: Toggle Neighborhood Pane', hint: 'Per-note relationship explorer — frontmatter wikilink groups, inverse relationships, and backlinks; click to open, ⌘/Ctrl-click to pivot', run: () => settings.toggleNeighborhood() },
-    { id: 'view.toggleTypesPanel', title: 'View: Toggle Types Pane', hint: 'Type-driven sidebar — notes with `type:<Name>` grouped into collapsible first-class sections (types-as-lenses)', run: () => settings.toggleTypesPanel() },
-    { id: 'type.create', title: 'Types: New Type…', hint: 'Create a type-definition note (`type: Type`) so its members get a first-class sidebar section', run: () => { settings.rightSidebarHidden = false; if (!settings.showTypesPanel) settings.toggleTypesPanel(); createTypeRequested.value = true; } },
-    { id: 'view.toggleHistoryPanel', title: 'View: Toggle History Pane', hint: 'Show / hide the per-note version history pane (does not disable Auto-Git)', run: () => settings.toggleHistoryPanel() },
+            { id: 'view.toggleHistoryPanel', title: 'View: Toggle History Pane', hint: 'Show / hide the per-note version history pane (does not disable Auto-Git)', run: () => settings.toggleHistoryPanel() },
     { id: 'view.toggleInspector', title: 'View: Toggle Properties Inspector', shortcut: kb('view.toggleInspector'), hint: 'Edit the active note’s YAML frontmatter as typed properties (text / number / date / status / tags / relation)', run: () => settings.toggleInspector() },
     { id: 'view.resetSidebarPanes', title: 'View: Reset Sidebar Pane Heights', hint: 'Clear stored per-pane heights so the right sidebar returns to even-share flex layout', run: () => settings.clearRightSidebarPaneHeights() },
     { id: 'view.toggleWrap', title: 'View: Toggle Word Wrap', run: () => settings.toggleWordWrap() },
@@ -298,45 +267,12 @@ export function useCommands(): Command[] {
       },
     },
 
-    {
-      id: 'cn.s2t',
-      title: 'Chinese: Simplified → Traditional',
-      hint: 'Convert document content',
-      run: () => transformActiveLazy((m) => m.simplifiedToTraditional, 'Converted to Traditional'),
-    },
-    {
-      id: 'cn.t2s',
-      title: 'Chinese: Traditional → Simplified',
-      run: () => transformActiveLazy((m) => m.traditionalToSimplified, 'Converted to Simplified'),
-    },
-    {
-      id: 'cn.copyPinyin',
-      title: 'Chinese: Copy Active Document as Pinyin',
-      run: async () => {
-        if (!tabs.activeTab) {
-          toasts.warning('No active document');
-          return;
-        }
-        const { pinyin } = await loadChineseConvert();
-        const t = freshActiveTab();
-        if (!t) return;
-        await writeText(pinyin(t.content));
-        toasts.success('Pinyin copied to clipboard');
-      },
-    },
-
+            
     // v2.5 F6: CJK proofread — flag common Chinese typos in the
     // active doc. The actual panel is owned by App.vue; we dispatch
     // a custom event because useCommands has no DOM/component
     // handles (same pattern as `help.markdown` and `search.global`).
-    {
-      id: 'proofread.cjk',
-      title: 'CJK Proofread — flag Chinese typos',
-      shortcut: kb('proofread.cjk'),
-      hint: 'Half-/full-width punct, 的/地/得 misuse, repeats, spacing',
-      run: () => window.dispatchEvent(new CustomEvent('solomd:open-cjk-proofread')),
-    },
-
+    
     {
       id: 'editor.find',
       title: 'Find…',
@@ -576,28 +512,13 @@ export function useCommands(): Command[] {
     },
 
     // ---- AI text cleanup ----
-    {
-      id: 'clean.aiArtifacts',
-      title: 'Clean AI Artifacts (smart quotes, em-dashes, invisible chars)',
-      hint: 'Strip junk Unicode that LLM chat interfaces leak into copied text',
-      run: () => transformActive(cleanAIArtifacts, 'AI artifacts cleaned'),
-    },
-    {
-      id: 'clean.stripMarkdown',
-      title: 'Strip All Markdown to Plain Text',
-      hint: 'Remove headings, bold, lists, code fences — leave only prose',
-      run: () => transformActive(stripMarkdownToPlain, 'Stripped to plain text'),
-    },
-
+        
     { id: 'export.html', title: 'Export to HTML…', run: () => exporter.exportHtml() },
-    { id: 'export.docx', title: 'Export to Word (DOCX)…', run: () => exporter.exportDocx() },
-    // Gitee IK8QJQ — the raster/text distinction decides whether the output
+        // Gitee IK8QJQ — the raster/text distinction decides whether the output
     // is searchable, so it belongs in the palette too, not just the toolbar.
     { id: 'export.pdfPrint', title: 'Export to PDF (text)…', hint: 'real selectable text, via system print', shortcut: kb('export.pdfPrint'), run: () => exporter.exportPdfPrint() },
     { id: 'file.print', title: 'Print…', hint: 'Open the system print dialog', shortcut: kb('file.print'), run: () => exporter.printDocument() },
-    { id: 'export.pdf', title: 'Export to PDF (image)…', hint: 'rasterised, text not selectable', run: () => exporter.exportPdf() },
-    { id: 'export.image', title: 'Export to Image (PNG)…', run: () => exporter.exportImage() },
-    { id: 'export.epub', title: 'Export to EPUB…', hint: 'via Pandoc', run: () => pandoc.exportTo('epub') },
+            { id: 'export.epub', title: 'Export to EPUB…', hint: 'via Pandoc', run: () => pandoc.exportTo('epub') },
     { id: 'export.odt', title: 'Export to ODT…', hint: 'via Pandoc', run: () => pandoc.exportTo('odt') },
     { id: 'export.latex', title: 'Export to LaTeX…', hint: 'via Pandoc', run: () => pandoc.exportTo('latex') },
     { id: 'export.rtf', title: 'Export to RTF…', hint: 'via Pandoc', run: () => pandoc.exportTo('rtf') },
@@ -629,24 +550,6 @@ export function useCommands(): Command[] {
       id: 'tags.refresh',
       title: 'Refresh Tag Index',
       run: () => useWorkspaceIndexStore().rescan(),
-    },
-    {
-      id: 'bases.open',
-      title: 'Workspace: Properties Table (Bases)',
-      hint: 'Browse all notes as a sortable / filterable table',
-      run: () => bases.openBases(),
-    },
-    {
-      id: 'views.toggle',
-      title: 'View: Toggle Saved Views Panel',
-      hint: 'Show / hide the Saved Views section in the left sidebar',
-      run: () => settings.toggleViewsPanel(),
-    },
-    {
-      id: 'views.create',
-      title: 'View: Create Saved View…',
-      hint: 'Define a persistent filtered note list (saved to .solomd/views/)',
-      run: () => savedViews.newView(),
     },
     {
       id: 'history.initWorkspace',
@@ -813,42 +716,7 @@ export function useCommands(): Command[] {
         window.dispatchEvent(new CustomEvent('solomd:open-help'));
       },
     },
-    {
-      id: 'view.slideshow',
-      title: 'Present Slideshow',
-      shortcut: kb('view.slideshow'),
-      hint: 'Render the active document as a fullscreen slideshow (split on `---`)',
-      run: async () => {
-        const t = freshActiveTab();
-        if (!t) {
-          toasts.warning('No active document');
-          return;
-        }
-        try {
-          localStorage.setItem('solomd:slideshow:content', t.content || '');
-          localStorage.setItem(
-            'solomd:slideshow:title',
-            t.fileName || 'Untitled',
-          );
-        } catch {}
-        const label = `solomd-slideshow-${Date.now()}`;
-        try {
-          const win = new WebviewWindow(label, {
-            url: '/?slideshow=1',
-            title: 'SoloMD — Slideshow',
-            width: 1200,
-            height: 800,
-            decorations: true,
-            resizable: true,
-          });
-          win.once('tauri://error', (e) => console.error('slideshow window error', e));
-        } catch (e) {
-          console.error('failed to open slideshow', e);
-          toasts.warning('Failed to open slideshow window');
-        }
-      },
-    },
-    {
+        {
       id: 'window.new',
       title: 'New Window',
       shortcut: kb('window.new'),

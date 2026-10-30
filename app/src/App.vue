@@ -14,8 +14,7 @@ import { setMarkdownHardBreaks, setMarkdownAutoNumberHeadings, setMarkdownSmartQ
 import { openNewWindow } from './lib/new-window';
 import { ensureSpellDict } from './lib/spell-suggest';
 import Toolbar from './components/Toolbar.vue';
-import TelemetryBanner from './components/TelemetryBanner.vue';
-import TileRoot from './components/TileRoot.vue';
+import PaneHost from './components/PaneHost.vue';
 import StatsPill from './components/StatsPill.vue';
 import Outline from './components/Outline.vue';
 import BacklinksPanel from './components/BacklinksPanel.vue';
@@ -23,33 +22,19 @@ const NeighborhoodPanel = defineAsyncComponent(() => import('./components/Neighb
 const RelationshipsPanel = defineAsyncComponent(() => import('./components/RelationshipsPanel.vue'));
 const TagsPanel = defineAsyncComponent(() => import('./components/TagsPanel.vue'));
 const TasksPanel = defineAsyncComponent(() => import('./components/TasksPanel.vue'));
-const TableEditor = defineAsyncComponent(() => import('./components/TableEditor.vue'));
-const FormulaEditor = defineAsyncComponent(() => import('./components/FormulaEditor.vue'));
-const TypesPanel = defineAsyncComponent(() => import('./components/TypesPanel.vue'));
 const HistoryPanel = defineAsyncComponent(() => import('./components/HistoryPanel.vue'));
 const PropertiesInspector = defineAsyncComponent(() => import('./components/PropertiesInspector.vue'));
-const AgentPanel = defineAsyncComponent(() => import('./components/AgentPanel.vue'));
-import RsSplitter from './components/RsSplitter.vue';
 import { useAutoCommit } from './composables/useAutoCommit';
 import { useGithubSync } from './composables/useGithubSync';
 import { useSessionRestore } from './composables/useSessionRestore';
 import SessionRestoreDialog from './components/SessionRestoreDialog.vue';
-import WhiteboardOverlay from './components/WhiteboardOverlay.vue';
-import AIRewriteOverlay from './components/AIRewriteOverlay.vue';
-const BasesView = defineAsyncComponent(() => import('./components/BasesView.vue'));
-import { BASES_OPEN_EVENT, BASES_CLOSE_EVENT } from './composables/useBasesView';
 const InboxView = defineAsyncComponent(() => import('./components/InboxView.vue'));
 import { INBOX_OPEN_EVENT, INBOX_CLOSE_EVENT } from './composables/useInboxView';
 // v4.6.1 F2 — Type lens (center-pane filtered view of one type's members).
-const TypeLensView = defineAsyncComponent(() => import('./components/TypeLensView.vue'));
-import { TYPE_LENS_OPEN_EVENT, TYPE_LENS_CLOSE_EVENT } from './composables/useTypeLens';
 import Sidebar from './components/Sidebar.vue';
 import PhoneTabBar from './components/PhoneTabBar.vue';
 import { usePhoneStore } from './stores/phone';
 // v4.6 F5 — Saved filtered views (sidebar panel + filtered list + editor).
-import ViewNoteList from './components/ViewNoteList.vue';
-import ViewEditorDialog from './components/ViewEditorDialog.vue';
-import { VIEW_OPEN_EVENT, VIEW_CLOSE_EVENT } from './composables/useSavedViews';
 import GlobalSearch from './components/GlobalSearch.vue';
 import ReadingView from './components/ReadingView.vue';
 import UnsavedDialog from './components/UnsavedDialog.vue';
@@ -77,18 +62,13 @@ import { useUpdateCheck } from './composables/useUpdateCheck';
 import { useCommands } from './composables/useCommands';
 import { useI18n } from './i18n';
 import { quickCaptureError } from './lib/quick-capture-status';
-import { tableEditor, closeTableEditor } from './lib/table-editor-bus';
-import { formulaEditor, closeFormulaEditor } from './lib/formula-editor-bus';
 import { track } from './lib/telemetry';
 import { openWelcomeTour } from './lib/welcome-tour';
 import { useWorkspaceStore } from './stores/workspace';
 import { useWorkspaceIndexStore } from './stores/workspaceIndex';
-import { useSavedViewsStore } from './stores/savedViews';
 import { usePropertiesStore } from './stores/properties';
-import { useRagStore } from './stores/rag';
 import { IS_APP_STORE_BUILD } from './lib/app-build';
 import { runWhenIdle } from './lib/idle';
-import { MERMAID_INSERT_SNIPPET } from './lib/insert-snippet';
 import { focusActiveEditorSoon } from './lib/editor-focus';
 const UiPreview = defineAsyncComponent(() => import('./components/UiPreview.vue'));
 
@@ -98,6 +78,7 @@ const UiPreview = defineAsyncComponent(() => import('./components/UiPreview.vue'
 const showUiKit = new URLSearchParams(location.search).has('uikit');
 
 const tabs = useTabsStore();
+const activeLeaf = computed(() => tiles.focusedLeaf || tiles.allLeaves[0]);
 const settings = useSettingsStore();
 const windowsStore = useWindowsStore();
 const tiles = useTilesStore();
@@ -143,7 +124,6 @@ async function requestAndroidStorage() {
 }
 const workspaceIndex = useWorkspaceIndexStore();
 const properties = usePropertiesStore();
-const rag = useRagStore();
 const autoCommit = useAutoCommit();
 autoCommit.start();
 // v2.6: GitHub sync rides on top of AutoGit — push commits AutoGit creates,
@@ -320,14 +300,9 @@ const { component: SettingsPanelC, open: settingsLazyOpen } = useLazyComponent(
   () => import('./components/SettingsPanel.vue'), () => settingsOpen.value);
 const { component: MarkdownHelpC, open: helpLazyOpen } = useLazyComponent(
   () => import('./components/MarkdownHelp.vue'), () => helpOpen.value);
-const { component: RagSearchC, open: ragSearchLazyOpen } = useLazyComponent(
-  () => import('./components/RagSearch.vue'), () => ragSearchOpen.value);
-const { component: CjkProofreadC, open: cjkProofreadLazyOpen } = useLazyComponent(
-  () => import('./components/CjkProofread.vue'), () => cjkProofreadOpen.value);
+
 const { component: AboutDialogC, open: aboutLazyOpen } = useLazyComponent(
   () => import('./components/AboutDialog.vue'), () => aboutOpen.value);
-const { component: AgentSetupWizardC, open: wizardLazyOpen } = useLazyComponent(
-  () => import('./components/AgentSetupWizard.vue'), () => wizardOpen.value);
 const { component: ImageUrlDialogC, open: imageUrlLazyOpen } = useLazyComponent(
   () => import('./components/ImageUrlDialog.vue'), () => imageUrlDialogOpen.value);
 const { component: AndroidFolderPickerC, open: androidPickerLazyOpen } = useLazyComponent(
@@ -848,24 +823,6 @@ watchEffect(() => {
 // (`rag_set_enabled` already wraps run_indexer). When the folder
 // changes we refresh the status line so the panel shows the right
 // counters.
-let ragLastFolder: string | null = null;
-let ragLastEnabled = false;
-watchEffect(() => {
-  const folder = workspace.currentFolder;
-  const enabled = settings.ragEnabled;
-  if (folder === ragLastFolder && enabled === ragLastEnabled) return;
-  ragLastFolder = folder;
-  ragLastEnabled = enabled;
-  if (!folder) {
-    rag.refreshStatus(null);
-    return;
-  }
-  if (enabled) {
-    rag.setEnabled(folder, true).catch(() => {});
-  } else {
-    rag.refreshStatus(folder).catch(() => {});
-  }
-});
 
 // v2.6: a successful GitHub pull touched files on disk under us. Refresh
 // the workspace index so the file tree + backlinks pick up renames /
@@ -884,17 +841,6 @@ window.addEventListener('solomd:remote-pulled', () => {
 // emits on watcher debounces. When semantic search is on, mirror that
 // event into a single-file rescan so the embeddings stay fresh without
 // a full reindex on every save.
-window.addEventListener(
-  'solomd:rag-bus',
-  (e) => {
-    if (!settings.ragEnabled) return;
-    const detail = (e as CustomEvent).detail || {};
-    const path = detail.path;
-    if (typeof path === 'string') {
-      rag.reindexFile(workspace.currentFolder, path).catch(() => {});
-    }
-  },
-);
 
 // v2.0 F2: load the Hunspell dictionary on demand.
 // #246 — the language is no longer pinned to en_US. `spellcheckLang` drives
@@ -970,8 +916,7 @@ const INSERT_SNIPPETS: Record<string, string> = {
   'insert.mathBlock': '\n$$\n$|$\n$$\n',
   'insert.mathInline': '$$|$$',
   'insert.table': '\n| $|$ | Header |\n| --- | --- |\n| cell | cell |\n',
-  'insert.mermaid': MERMAID_INSERT_SNIPPET,
-  'insert.hr': '\n---\n',
+    'insert.hr': '\n---\n',
 };
 
 /**
@@ -1015,14 +960,6 @@ async function runEditHistory(kind: 'undo' | 'redo') {
  * menu-only entries below.
  */
 function dispatchMenuAction(id: string) {
-  // The table's working copy belongs to its original note/view. Native menu
-  // accelerators must not close or change that view underneath the dialog.
-  if (tableEditor.session) {
-    if (id === 'file.closeTab' || id === 'file.exit') {
-      window.dispatchEvent(new Event('solomd:table-close-request'));
-    }
-    return;
-  }
   if (id.startsWith('recent.open:')) {
     const path = workspace.recentFiles[Number(id.slice('recent.open:'.length))];
     if (path) void files.openPath(path);
@@ -1536,10 +1473,6 @@ onMounted(async () => {
     await listen<string>('solomd://close-requested', async (e) => {
       const me = getCurrentWindow().label;
       if (e.payload && e.payload !== me) return;
-      if (tableEditor.session) {
-        window.dispatchEvent(new Event('solomd:table-close-request'));
-        return;
-      }
       // Editors sync their document into the store on a debounce; text typed
       // just before the close would otherwise miss the persist below.
       flushPendingEdits();
@@ -1661,27 +1594,12 @@ function onAIRewriteAccept(e: Event) {
 function onAIRewriteCancel() {
   // No-op for now; AIRewriteOverlay self-closes.
 }
-function onOpenBases() { basesOpen.value = true; viewOpen.value = false; typeLensOpen.value = false; }
-function onCloseBases() { basesOpen.value = false; }
 function onOpenInbox() { inboxViewOpen.value = true; typeLensOpen.value = false; }
 function onCloseInbox() { inboxViewOpen.value = false; }
 // v4.6.1 F2 — type lens content swap. Mutually exclusive with the other
 // center-pane overlays (mirrors basesOpen / inboxViewOpen). The open event
 // carries which type to focus; we pass it down as a prop so the view is
 // ready on mount (the event fired before the component existed).
-function onOpenTypeLens(e: Event) {
-  const name = (e as CustomEvent).detail?.typeName;
-  if (typeof name !== 'string' || !name) return;
-  typeLensName.value = name;
-  typeLensOpen.value = true;
-  basesOpen.value = false;
-  inboxViewOpen.value = false;
-  viewOpen.value = false;
-}
-function onCloseTypeLens() { typeLensOpen.value = false; }
-// v4.6 F5 — saved-view content swap.
-function onOpenView() { viewOpen.value = true; basesOpen.value = false; typeLensOpen.value = false; }
-function onCloseView() { viewOpen.value = false; }
 
 async function onWikiOpen(e: Event) {
   const detail = (e as CustomEvent).detail || {};
@@ -1761,14 +1679,8 @@ function onLeaveCenterOverlay() {
 window.addEventListener('solomd:wiki-open', onWikiOpen as EventListener);
 window.addEventListener('solomd:ai-rewrite-accept', onAIRewriteAccept as EventListener);
 window.addEventListener('solomd:ai-rewrite-cancel', onAIRewriteCancel as EventListener);
-window.addEventListener(BASES_OPEN_EVENT, onOpenBases as EventListener);
-window.addEventListener(BASES_CLOSE_EVENT, onCloseBases as EventListener);
 window.addEventListener(INBOX_OPEN_EVENT, onOpenInbox as EventListener);
 window.addEventListener(INBOX_CLOSE_EVENT, onCloseInbox as EventListener);
-window.addEventListener(TYPE_LENS_OPEN_EVENT, onOpenTypeLens as EventListener);
-window.addEventListener(TYPE_LENS_CLOSE_EVENT, onCloseTypeLens as EventListener);
-window.addEventListener(VIEW_OPEN_EVENT, onOpenView as EventListener);
-window.addEventListener(VIEW_CLOSE_EVENT, onCloseView as EventListener);
 window.addEventListener('solomd:leave-center-overlay', onLeaveCenterOverlay);
 window.addEventListener('solomd:open-settings', onOpenSettingsEvent as EventListener);
 
@@ -1793,15 +1705,9 @@ onBeforeUnmount(() => {
   window.removeEventListener('solomd:wiki-open', onWikiOpen as EventListener);
   window.removeEventListener('solomd:ai-rewrite-accept', onAIRewriteAccept as EventListener);
   window.removeEventListener('solomd:ai-rewrite-cancel', onAIRewriteCancel as EventListener);
-  window.removeEventListener(BASES_OPEN_EVENT, onOpenBases as EventListener);
-  window.removeEventListener(BASES_CLOSE_EVENT, onCloseBases as EventListener);
   window.removeEventListener('solomd:leave-center-overlay', onLeaveCenterOverlay);
   window.removeEventListener(INBOX_OPEN_EVENT, onOpenInbox as EventListener);
   window.removeEventListener(INBOX_CLOSE_EVENT, onCloseInbox as EventListener);
-  window.removeEventListener(TYPE_LENS_OPEN_EVENT, onOpenTypeLens as EventListener);
-  window.removeEventListener(TYPE_LENS_CLOSE_EVENT, onCloseTypeLens as EventListener);
-  window.removeEventListener(VIEW_OPEN_EVENT, onOpenView as EventListener);
-  window.removeEventListener(VIEW_CLOSE_EVENT, onCloseView as EventListener);
   window.removeEventListener('solomd:open-settings', onOpenSettingsEvent as EventListener);
   window.removeEventListener('solomd:open-agent-wizard', onOpenAgentWizard);
   window.removeEventListener('solomd:open-image-url-dialog', onOpenImageUrlDialog);
@@ -2259,7 +2165,6 @@ const basesOpen = ref(false);
 const inboxViewOpen = ref(false);
 // v4.6.1 F2 — type lens (full-pane filtered list of one type's members).
 const typeLensOpen = ref(false);
-const typeLensName = ref('');
 // v4.6 F5 — when a saved view is opened from the sidebar, the content area
 // swaps to ViewNoteList (mirrors the basesOpen pattern).
 const viewOpen = ref(false);
@@ -2278,8 +2183,7 @@ const viewOpen = ref(false);
  * a SAF-mounted workspace that can't read `.solomd/views/` hits it easily,
  * though it is not Android-specific.
  */
-const savedViewsStore = useSavedViewsStore();
-const viewPaneVisible = computed(() => viewOpen.value && !!savedViewsStore.activeView);
+// saved views store removed
 const aiHasKey = ref(false);
 async function refreshAiHasKey() {
   if (!settings.aiEnabled) { aiHasKey.value = false; return; }
@@ -2372,8 +2276,7 @@ watchEffect(() => { void settings.aiEnabled; void settings.aiProvider; refreshAi
         @open-help="helpOpen = true"
         @open-search="toggleGlobalSearch()"
       />
-      <TelemetryBanner />
-      <div class="workspace">
+            <div class="workspace">
         <aside
           v-if="showRightSidebar && settings.outlineSide === 'left'"
           class="side-sidebar side-sidebar--left"
@@ -2381,9 +2284,8 @@ watchEffect(() => { void settings.aiEnabled; void settings.aiProvider; refreshAi
           @contextmenu.prevent="openSidebarCtx"
         >
           <div class="side-sidebar__resize side-sidebar__resize--right" @mousedown="onSidebarResize('left', $event)" />
-          <template v-for="(p, idx) in visibleRsPanes" :key="p.id">
-            <RsSplitter v-if="idx > 0" :above="visibleRsPanes[idx-1].id" :below="p.id" />
-            <div
+          <template v-for="p in visibleRsPanes" :key="p.id">
+                        <div
               :data-rs-pane="p.id"
               :class="[
                 'rs-pane-host',
@@ -2419,27 +2321,21 @@ watchEffect(() => { void settings.aiEnabled; void settings.aiProvider; refreshAi
                 v-if="p.id === 'neighborhood'"
                 @close="ctxToggle(() => settings.toggleNeighborhood())"
               />
-              <TypesPanel
-                v-if="p.id === 'types'"
-                @close="ctxToggle(() => settings.toggleTypesPanel())"
-              />
-              <HistoryPanel v-if="p.id === 'history'" @close="ctxToggle(() => settings.toggleHistoryPanel())" />
+                            <HistoryPanel v-if="p.id === 'history'" @close="ctxToggle(() => settings.toggleHistoryPanel())" />
               <PropertiesInspector v-if="p.id === 'inspector'" @close="ctxToggle(() => settings.toggleInspector())" />
-              <AgentPanel
-                v-if="p.id === 'agent'"
-                @open-settings="(section?: string) => openSettingsAt(section ?? 'integrations')"
-                @close="ctxToggle(() => settings.toggleAgentPanel())"
-              />
-            </div>
+                          </div>
           </template>
         </aside>
         <div class="content">
-          <BasesView v-if="basesOpen" />
-          <InboxView v-else-if="inboxViewOpen" />
-          <TypeLensView v-else-if="typeLensOpen" :type-name="typeLensName" />
-          <ViewNoteList v-else-if="viewPaneVisible" />
-          <TileRoot v-else :node="tiles.root" @cursor="onCursor" @selection="onSelection" />
-          <StatsPill v-if="!basesOpen && !inboxViewOpen && !typeLensOpen && !viewPaneVisible" :line="cursorLine" :col="cursorCol" :selection-text="selectionText" />
+          <InboxView v-if="inboxViewOpen" />
+          <PaneHost
+            v-else-if="activeLeaf"
+            :pane-id="activeLeaf.id"
+            :active-tab-id="activeLeaf.activeTabId"
+            @cursor="onCursor"
+            @selection="onSelection"
+          />
+          <StatsPill v-if="!inboxViewOpen" :line="cursorLine" :col="cursorCol" :selection-text="selectionText" />
         </div>
         <aside
           v-if="showRightSidebar && settings.outlineSide !== 'left'"
@@ -2448,9 +2344,8 @@ watchEffect(() => { void settings.aiEnabled; void settings.aiProvider; refreshAi
           @contextmenu.prevent="openSidebarCtx"
         >
           <div class="side-sidebar__resize side-sidebar__resize--left" @mousedown="onSidebarResize('right', $event)" />
-          <template v-for="(p, idx) in visibleRsPanes" :key="p.id">
-            <RsSplitter v-if="idx > 0" :above="visibleRsPanes[idx-1].id" :below="p.id" />
-            <div
+          <template v-for="p in visibleRsPanes" :key="p.id">
+                        <div
               :data-rs-pane="p.id"
               :class="[
                 'rs-pane-host',
@@ -2486,18 +2381,9 @@ watchEffect(() => { void settings.aiEnabled; void settings.aiProvider; refreshAi
                 v-if="p.id === 'neighborhood'"
                 @close="ctxToggle(() => settings.toggleNeighborhood())"
               />
-              <TypesPanel
-                v-if="p.id === 'types'"
-                @close="ctxToggle(() => settings.toggleTypesPanel())"
-              />
-              <HistoryPanel v-if="p.id === 'history'" @close="ctxToggle(() => settings.toggleHistoryPanel())" />
+                            <HistoryPanel v-if="p.id === 'history'" @close="ctxToggle(() => settings.toggleHistoryPanel())" />
               <PropertiesInspector v-if="p.id === 'inspector'" @close="ctxToggle(() => settings.toggleInspector())" />
-              <AgentPanel
-                v-if="p.id === 'agent'"
-                @open-settings="(section?: string) => openSettingsAt(section ?? 'integrations')"
-                @close="ctxToggle(() => settings.toggleAgentPanel())"
-              />
-            </div>
+                          </div>
           </template>
         </aside>
       </div>
@@ -2505,22 +2391,8 @@ watchEffect(() => { void settings.aiEnabled; void settings.aiProvider; refreshAi
       </div>
       <!-- Grid editor for the table under the caret. The pane that found the
            table supplies the write-back closure, so this stays pane-agnostic. -->
-      <TableEditor
-        v-if="tableEditor.session"
-        :source="tableEditor.session.source"
-        @apply="(md: string) => tableEditor.session?.apply(md)"
-        @close="closeTableEditor()"
-      />
-
-      <FormulaEditor
-        v-if="formulaEditor.session"
-        :latex="formulaEditor.session.latex"
-        :display="formulaEditor.session.display"
-        :labels="formulaEditor.session.labels"
-        @apply="(latex: string, display: boolean) => formulaEditor.session?.apply(latex, display)"
-        @close="closeFormulaEditor()"
-      />
-
+      
+      
       <!-- v4.3.0 PR #75 — right-click context menu for sidebar pane toggles. -->
       <Teleport to="body">
         <div
@@ -2574,16 +2446,7 @@ watchEffect(() => { void settings.aiEnabled; void settings.aiProvider; refreshAi
       </Teleport>
     </template>
 
-    <AIRewriteOverlay
-      v-if="!IS_APP_STORE_BUILD"
-      :enabled="settings.aiEnabled"
-      :provider="(settings.aiProvider as any)"
-      :model="settings.aiModel"
-      :base-url="settings.aiBaseUrl"
-      :has-key="aiHasKey"
-      @open-settings="(section?: string) => openSettingsAt(section ?? 'integrations')"
-    />
-    <component :is="CommandPaletteC" v-if="CommandPaletteC" :open="paletteLazyOpen" @close="paletteOpen = false" />
+        <component :is="CommandPaletteC" v-if="CommandPaletteC" :open="paletteLazyOpen" @close="paletteOpen = false" />
     <component :is="QuickSwitcherC" v-if="QuickSwitcherC" :open="quickSwitcherLazyOpen" @close="quickSwitcherOpen = false" />
     <component
       :is="SettingsPanelC"
@@ -2593,17 +2456,8 @@ watchEffect(() => { void settings.aiEnabled; void settings.aiProvider; refreshAi
       @close="settingsOpen = false; settingsInitialSection = null; refreshAiHasKey()"
     />
     <component :is="MarkdownHelpC" v-if="MarkdownHelpC" :open="helpLazyOpen" :tab="helpTab" @close="helpOpen = false" />
-    <component
-      :is="RagSearchC"
-      v-if="RagSearchC"
-      :open="ragSearchLazyOpen"
-      @close="ragSearchOpen = false"
-      @open-settings="(section?: string) => { ragSearchOpen = false; openSettingsAt(section ?? 'writing'); }"
-    />
-    <component :is="CjkProofreadC" v-if="CjkProofreadC" :open="cjkProofreadLazyOpen" @close="cjkProofreadOpen = false" />
-    <component :is="AboutDialogC" v-if="AboutDialogC" :open="aboutLazyOpen" @close="aboutOpen = false" />
-    <component :is="AgentSetupWizardC" v-if="!IS_APP_STORE_BUILD && AgentSetupWizardC" :open="wizardLazyOpen" @close="wizardOpen = false" />
-    <UnsavedDialog
+            <component :is="AboutDialogC" v-if="AboutDialogC" :open="aboutLazyOpen" @close="aboutOpen = false" />
+        <UnsavedDialog
       :open="unsavedOpen"
       :mode="unsavedMode"
       :file-name="unsavedFileName"
@@ -2621,9 +2475,7 @@ watchEffect(() => { void settings.aiEnabled; void settings.aiProvider; refreshAi
     />
     <SessionRestoreDialog />
     <!-- v4.6 F5 — saved-view create/edit modal (self-mounts via window events). -->
-    <ViewEditorDialog />
-    <WhiteboardOverlay />
-    <FileChangedDialog
+            <FileChangedDialog
       :open="fileChangedOpen"
       :file-name="fileChangedFileName"
       @reload="onFileChangedAction('reload')"

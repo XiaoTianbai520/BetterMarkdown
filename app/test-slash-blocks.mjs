@@ -28,14 +28,13 @@ const mod = await import(pathToFileURL(out).href);
 const { SLASH_BLOCKS, expandSnippet, filterBlocks } = mod;
 
 // ---- Catalog shape -------------------------------------------------------
-assert.equal(SLASH_BLOCKS.length, 21, 'catalog should have 21 entries');
+assert.equal(SLASH_BLOCKS.length, 19, 'catalog should have 19 entries');
 const ids = new Set(SLASH_BLOCKS.map((b) => b.id));
 for (const required of [
   'h1', 'h2', 'h3',
   'bullet', 'numbered', 'todo',
   'code', 'quote', 'divider', 'table',
-  'math_block', 'math_inline', 'mermaid',
-  'whiteboard',
+  'math_block', 'math_inline',
   'link', 'image',
   'bold', 'italic', 'strikethrough', 'inline_code',
   'frontmatter',

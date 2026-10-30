@@ -9,7 +9,6 @@ import { tabCaretMemory, tabTopLineMemory, type TabCaretSnapshot } from '../lib/
 import { syntaxHighlighting, defaultHighlightStyle, indentOnInput, bracketMatching } from '@codemirror/language';
 import { markdown, markdownLanguage } from '@codemirror/lang-markdown';
 import { cjkFriendlyEmphasis } from '../lib/cm-cjk-emphasis';
-import { bindMermaidInteractions, initMermaid } from '../lib/mermaid-lazy';
 import { parseInsertSnippet } from '../lib/insert-snippet';
 // The grammar imports and the `codeLanguages` list they feed now live in
 // `lib/code-languages.ts`: the ``` fence-language picker (#297) derives its
@@ -17,8 +16,7 @@ import { parseInsertSnippet } from '../lib/insert-snippet';
 import { codeLanguages } from '../lib/code-languages';
 import { fenceLanguageComplete, fenceLanguageExtension } from '../lib/cm-fence-completion';
 import { filterFenceLanguages, isInsideFenceBefore, matchFenceOpener } from '../lib/fence-languages';
-import { vim, Vim } from '@replit/codemirror-vim';
-import { cmThemeFor, mermaidThemeFor, activeLineExtension } from '../lib/themes';
+import { cmThemeFor, activeLineExtension } from '../lib/themes';
 import { registerPlainSelectionGetter } from '../lib/plain-selection';
 import {
   headingFoldExtension,
@@ -27,10 +25,6 @@ import {
   unfoldAllFolds,
   foldHeadingsToLevel,
 } from '../lib/cm-heading-fold';
-import { findTableSpan } from '../lib/markdown-table';
-import { findMathSpanAt, collectLabels } from '../lib/equations';
-import { openFormulaEditor } from '../lib/formula-editor-bus';
-import { openTableEditor } from '../lib/table-editor-bus';
 import {
   scanHeadings,
   foldedCharRanges,
@@ -61,7 +55,6 @@ import type { Tab } from '../types';
 import { livePreviewExtension, richHighlightOnly } from '../lib/cm-live-preview';
 import { liveEditExtension, setLiveEditCopyLabel } from '../lib/cm-live-render';
 import { liveBlocksExtension, liveBlocksTheme, extractImageRoot } from '../lib/cm-live-blocks';
-import { findTldrawFences, replaceBoardSnapshot } from '../lib/tldraw-board';
 import { dragAwareExtension } from '../lib/cm-drag-aware';
 import { imagePasteExtension, insertImageFromPath as cmInsertImageFromPath, imageTextFromPath, handleTextareaImagePaste, type ImagePasteOptions } from '../lib/cm-image-paste';
 import { markdownImage, encodeImageDestination, resizeMarkdownImageLine } from '../lib/md-image-url';
@@ -69,10 +62,8 @@ import { resolveUploader, uploadImage, type ImageUploadSettings } from '../lib/i
 import { focusModeExtension, typewriterModeExtension } from '../lib/cm-focus-mode';
 import { wikilinkExtension, wikilinkComplete } from '../lib/cm-wikilink';
 import { tagAutocompleteExtension, tagComplete } from '../lib/cm-tag-autocomplete';
-import { citationsExtension, citationCompleteSource } from '../lib/cm-citations';
 import { autocompletion } from '@codemirror/autocomplete';
-import { aiRewriteExtension } from '../lib/cm-ai-rewrite';
-import { cmKeyOwnedByApp, combosFor, toCodeMirrorKey, eventToCombo, resolveBindings } from '../lib/keybindings';
+import { cmKeyOwnedByApp, eventToCombo, resolveBindings } from '../lib/keybindings';
 import {
   docParagraphStarts,
   nextParagraphStart,
@@ -85,10 +76,7 @@ import { slashCommandsExtension } from '../lib/cm-slash-commands';
 import { useI18n } from '../i18n';
 import { spellcheckExtension } from '../lib/cm-spellcheck';
 import { spellcheckTheme } from '../lib/cm-spellcheck-theme';
-import { languagetoolExtension, languagetoolHitAt, type LtHit } from '../lib/cm-languagetool';
-import { languagetoolCoversSpelling, ltAddWord, ltDisableRule, ltIgnore, matchWords } from '../lib/languagetool';
 import { usePandocExport } from '../composables/usePandocExport';
-import type { CitationEntry } from '../lib/citations';
 import { taskListExtension } from '../lib/cm-task-list';
 import { imeCompositionGuard } from '../lib/cm-ime-guard';
 import {
@@ -203,7 +191,7 @@ function imagePasteOpts(): ImagePasteOptions {
   };
 }
 const pandoc = usePandocExport();
-let cachedCitations: CitationEntry[] = [];
+let cachedCitations: any[] = [];
 pandoc.loadCitations().then((c) => { cachedCitations = c; }).catch(() => {});
 watch(
   () => settings.workspaceBibliography,
@@ -228,8 +216,6 @@ const cursorCompartment = new Compartment();
 // #344 — optional caret-line tint (the base theme paints .cm-activeLine clear).
 const activeLineCompartment = new Compartment();
 const fontSizeCompartment = new Compartment();
-// #180 — the AI-rewrite chord is user-bindable; keep it reconfigurable.
-const aiKeyCompartment = new Compartment();
 // B4 — CodeMirror's own default/search keymap, minus every chord an app-level
 // shortcut owns (see `cmKeyOwnedByApp`). Reconfigured when bindings change.
 const baseKeymapCompartment = new Compartment();
@@ -294,100 +280,6 @@ const foldCompartment = new Compartment();
 // `solomd:menu-action` bus the menu bar and Ctrl+S use, so save / save-and-close
 // / close honour the app's real save + unsaved-tab flow. Registered once on the
 // global Vim singleton (idempotent guard — defineEx would otherwise stack).
-if (!(globalThis as { __solomdVimEx?: boolean }).__solomdVimEx) {
-  (globalThis as { __solomdVimEx?: boolean }).__solomdVimEx = true;
-  const menu = (id: string) =>
-    window.dispatchEvent(new CustomEvent('solomd:menu-action', { detail: id }));
-  // `:w` / `:write` — save the active tab.
-  Vim.defineEx('write', 'w', () => menu('file.save'));
-  // `:wq` / `:x` / `:xit` — save, then close only once the save actually lands.
-  // saveActive() is async, so closing synchronously would hit a still-dirty tab
-  // and pop the unsaved-changes dialog; wait for the one-shot `solomd:saved`.
-  const saveThenClose = () => {
-    let timer = 0;
-    const onSaved = () => {
-      clearTimeout(timer);
-      window.removeEventListener('solomd:saved', onSaved);
-      menu('file.closeTab');
-    };
-    window.addEventListener('solomd:saved', onSaved);
-    // If the save is cancelled (e.g. the Save-As dialog on an untitled buffer)
-    // the `solomd:saved` never fires; drop the listener so it can't later close
-    // an unrelated tab on the next save. 10s comfortably covers a real write.
-    timer = window.setTimeout(() => window.removeEventListener('solomd:saved', onSaved), 10000);
-    menu('file.save');
-  };
-  Vim.defineEx('wq', 'wq', saveThenClose);
-  Vim.defineEx('xit', 'x', saveThenClose);
-  // `:q` / `:quit` — close the tab (unsaved changes trigger the confirm dialog).
-  Vim.defineEx('quit', 'q', () => menu('file.closeTab'));
-
-  // #447 — Sync Vim unnamed / clipboard registers (`"`, `+`, `*`) with the OS
-  // pasteboard so yanking/deleting in Vim mode can be pasted outside SoloMD,
-  // and copying outside SoloMD can be pasted with `p` / `P` in Vim mode.
-  try {
-    const regCtrl = (
-      Vim as unknown as {
-        getRegisterController?: () => {
-          pushText?: (
-            registerName: string | undefined,
-            operator: string,
-            text: string,
-            linewise?: boolean,
-            blockwise?: boolean,
-          ) => void;
-          getRegister?: (name?: string) => {
-            setText?: (text: string, linewise?: boolean, blockwise?: boolean) => void;
-          };
-          unnamedRegister?: {
-            setText?: (text: string, linewise?: boolean, blockwise?: boolean) => void;
-          };
-        };
-      }
-    ).getRegisterController?.();
-    if (regCtrl && typeof regCtrl.pushText === 'function') {
-      const origPushText = regCtrl.pushText.bind(regCtrl);
-      regCtrl.pushText = (registerName, operator, text, linewise, blockwise) => {
-        origPushText(registerName, operator, text, linewise, blockwise);
-        if (
-          text &&
-          (!registerName || registerName === '"' || registerName === '+' || registerName === '*')
-        ) {
-          (globalThis as { __solomdLastVimClip?: string }).__solomdLastVimClip = text;
-          void writeClipboard(text);
-        }
-      };
-    }
-  } catch {}
-}
-
-async function syncSystemClipboardToVimRegister() {
-  if (!settings.vimMode) return;
-  try {
-    const clip = await readClipboard();
-    if (!clip) return;
-    const g = globalThis as { __solomdLastVimClip?: string };
-    if (g.__solomdLastVimClip === clip) return;
-    g.__solomdLastVimClip = clip;
-    const regCtrl = (
-      Vim as unknown as {
-        getRegisterController?: () => {
-          getRegister?: (name?: string) => {
-            setText?: (text: string, linewise?: boolean, blockwise?: boolean) => void;
-          };
-          unnamedRegister?: {
-            setText?: (text: string, linewise?: boolean, blockwise?: boolean) => void;
-          };
-        };
-      }
-    ).getRegisterController?.();
-    if (!regCtrl) return;
-    const linewise = clip.endsWith('\n');
-    regCtrl.unnamedRegister?.setText?.(clip, linewise, false);
-    regCtrl.getRegister?.('+')?.setText?.(clip, linewise, false);
-    regCtrl.getRegister?.('*')?.setText?.(clip, linewise, false);
-  } catch {}
-}
 
 // #373 — Vim must see keys before every other keymap. The markdown keymap
 // (Enter → insertNewlineContinueMarkup) sits at Prec.high and defaultKeymap
@@ -397,9 +289,7 @@ async function syncSystemClipboardToVimRegister() {
 // does that regardless of where the compartment sits. In Insert mode Vim
 // declines keys it has no mapping for (Enter, Tab, Mod-*), so list
 // continuation, indentation, autocomplete and app shortcuts still run.
-function vimExtension() {
-  return Prec.highest(vim());
-}
+function vimExtension() { return []; }
 
 // `?forcePlain` query flag forces the Windows plain-textarea editor on any OS —
 // a dev/test hook so the Windows-only path can be exercised on macOS/Linux. It
@@ -534,7 +424,6 @@ const plainSelectAll = ref(false);
 // selection and must not be mistaken for "user collapsed it — exit".
 let plainSelectAllPending = false;
 const plainComposing = ref(false);
-let plainMermaidIdSeq = 0;
 const plainRenderCache = new Map<string, string>();
 // Bumps when KaTeX / highlight.js finish loading (lib/render-deps.ts). Part
 // of the cache key below, so blocks rendered with placeholder math / plain
@@ -818,92 +707,7 @@ async function processPlainLiveRenderedBlocks() {
     }
   }
 
-  const mermaidBlocks = hostEl.querySelectorAll('.plain-block__render pre > code.language-mermaid');
-  // Configure on demand rather than at setup: the theme is read here, so a
-  // theme switch between renders is picked up, and a vault with no diagrams
-  // never loads the renderer at all.
-  const mermaid = mermaidBlocks.length
-    ? await initMermaid({
-        startOnLoad: false,
-        securityLevel: 'strict',
-        theme: mermaidThemeFor(settings.theme),
-      })
-    : null;
-  for (const block of Array.from(mermaidBlocks)) {
-    if (!mermaid) break;
-    const pre = block.parentElement as HTMLElement | null;
-    if (!pre || pre.dataset.rendered === '1') continue;
-    pre.dataset.rendered = '1';
-    const code = (block.textContent || '').trim();
-    const id = `plain-mmd-${++plainMermaidIdSeq}`;
-    try {
-      const { svg, bindFunctions } = await mermaid.render(id, code);
-      const wrap = document.createElement('div');
-      wrap.className = 'plain-mermaid-block';
-      wrap.innerHTML = svg;
-      pre.replaceWith(wrap);
-      bindMermaidInteractions(wrap, bindFunctions);
-    } catch (e) {
-      pre.classList.add('plain-block__broken');
-      pre.textContent = `Mermaid error: ${(e as Error).message}`;
-    }
-  }
-
-  const tldrawBlocks = hostEl.querySelectorAll('.plain-block__render pre > code.language-tldraw');
-  if (tldrawBlocks.length === 0) {
-    // No boards to swap in — the remaining code blocks are final, so hand
-    // them their copy buttons and stop here.
-    attachPlainCodeCopyButtons(hostEl);
-    return;
-  }
-  const { boardToSvg } = await import('../lib/tldraw-runtime');
-  const fences = findTldrawFences(plainText.value || '');
-  const theme = {
-    colorScheme: (settings.theme === 'dark' ? 'dark' : 'light') as 'dark' | 'light',
-    locale: settings.language || 'en',
-  };
-  for (const block of Array.from(tldrawBlocks)) {
-    const pre = block.parentElement as HTMLElement | null;
-    if (!pre || pre.dataset.rendered === '1') continue;
-    pre.dataset.rendered = '1';
-    const body = (block.textContent || '').trim();
-    const fence = fences.find((item) => item.snapshot.trim() === body) ?? null;
-    const wrap = document.createElement('div');
-    wrap.className = 'plain-whiteboard-block';
-    try {
-      const svg = await boardToSvg(fence?.snapshot ?? body, theme);
-      if (svg) {
-        wrap.innerHTML = svg;
-        if (fence?.boardId) {
-          wrap.classList.add('plain-whiteboard-block--clickable');
-          wrap.setAttribute('role', 'button');
-          wrap.setAttribute('tabindex', '0');
-          wrap.title = t('whiteboard.openFull');
-          const openFull = () => {
-            window.dispatchEvent(
-              new CustomEvent('solomd:whiteboard-open', {
-                detail: { boardId: fence.boardId, tabId: props.tab.id, snapshot: fence.snapshot },
-              }),
-            );
-          };
-          wrap.addEventListener('click', openFull);
-          wrap.addEventListener('keydown', (ev) => {
-            if ((ev as KeyboardEvent).key === 'Enter' || (ev as KeyboardEvent).key === ' ') {
-              ev.preventDefault();
-              openFull();
-            }
-          });
-        }
-      } else {
-        wrap.classList.add('plain-block__broken');
-        wrap.textContent = t('whiteboard.empty');
-      }
-      pre.replaceWith(wrap);
-    } catch {
-      pre.classList.add('plain-block__broken');
-      pre.textContent = t('whiteboard.loadFailed');
-    }
-  }
+  
 
   attachPlainCodeCopyButtons(hostEl);
 }
@@ -3517,9 +3321,6 @@ const editorCtx = ref<{
 // #376 — the misspelled word the menu was opened on, for replacing it with a
 // suggestion. `el` is the textarea on the Windows paths, null for CodeMirror.
 let ctxSpell: { el: HTMLTextAreaElement | null; from: number; to: number; word: string } | null = null;
-// The LanguageTool match the menu was opened on (CodeMirror only); when set,
-// `ctxSpell` holds its range and the menu items act on LanguageTool.
-let ctxLt: LtHit | null = null;
 let ctxSeq = 0;
 let ctxTextarea: HTMLTextAreaElement | null = null;
 // #362 — the rendered image the menu was opened on (CodeMirror live-edit
@@ -3556,12 +3357,11 @@ async function onEditorContextMenu(event: MouseEvent) {
   // the pointer's offset in it, and where that line starts in the editor.
   let spellProbe: { el: HTMLTextAreaElement | null; line: string; offset: number; base: number; selFrom: number; selTo: number } | null = null;
   const spellOn = props.spellCheck || settings.spellcheckEnabled;
-  let ltHit: LtHit | null = null;
   if (!usePlainWindowsEditor) {
     hasSelection = !!view && !view.state.selection.main.empty;
     ctxTextarea = null;
     const pos = view ? view.posAtCoords({ x: event.clientX, y: event.clientY }) : null;
-    if (view && pos != null && settings.ltMode !== 'off') ltHit = languagetoolHitAt(view, pos);
+    
     if (spellOn && view) {
       if (pos != null) {
         const line = view.state.doc.lineAt(pos);
@@ -3601,21 +3401,8 @@ async function onEditorContextMenu(event: MouseEvent) {
   ctxImage = clickedImage;
   const seq = ++ctxSeq;
   ctxSpell = null;
-  ctxLt = null;
   let spell: EditorMenuSpell | null = null;
-  const sel = view?.state.selection.main;
-  if (ltHit && (!hasSelection || (sel && sel.from === ltHit.from && sel.to === ltHit.to))) {
-    ctxLt = ltHit;
-    ctxSpell = { el: null, from: ltHit.from, to: ltHit.to, word: ltHit.text };
-    spell = {
-      word: ltHit.text,
-      suggestions: ltHit.match.replacements,
-      canAdd: ltHit.match.issueType === 'misspelling',
-      message: ltHit.match.message,
-      canIgnore: true,
-      addWords: matchWords(ltHit.text),
-    };
-  } else if (spellProbe) {
+  if (spellProbe) {
     const hit = await lookupMisspelling(spellProbe.line, spellProbe.offset, settings.spellcheckLang);
     if (seq !== ctxSeq) return; // a newer right-click took over
     if (hit) {
@@ -3646,7 +3433,6 @@ function onEditorMenuReplace(word: string) {
   editorCtx.value = null;
   const target = ctxSpell;
   ctxSpell = null;
-  ctxLt = null;
   ctxTextarea = null;
   ctxImage = null;
   if (!target) return;
@@ -3674,11 +3460,8 @@ function onEditorMenuReplace(word: string) {
 async function onEditorMenuAddWord(word: string) {
   editorCtx.value = null;
   ctxSpell = null;
-  const lt = ctxLt;
-  ctxLt = null;
   try {
-    if (lt) await ltAddWord(word);
-    else await addToSpellDict(word);
+    await addToSpellDict(word);
   } catch (err) {
     console.warn('[spellcheck] add to dictionary failed', err);
   }
@@ -3686,16 +3469,7 @@ async function onEditorMenuAddWord(word: string) {
 }
 
 /** LanguageTool: ignore this match (session) or switch its rule off. */
-function onEditorMenuLtIgnore(disableRule: boolean) {
-  editorCtx.value = null;
-  ctxSpell = null;
-  const lt = ctxLt;
-  ctxLt = null;
-  if (!lt) return;
-  if (disableRule) ltDisableRule(lt.match.ruleId);
-  else ltIgnore(lt.match, lt.text);
-  view?.focus();
-}
+function onEditorMenuLtIgnore(_disableRule: boolean) {}
 
 async function copyContextImage(img: HTMLImageElement) {
   try {
@@ -3729,7 +3503,6 @@ async function readClipboard(): Promise<string> {
 function onEditorMenuResizeImage(size: string) {
   editorCtx.value = null;
   ctxSpell = null;
-  ctxLt = null;
   const img = ctxImage;
   ctxImage = null;
   ctxTextarea = null;
@@ -3975,13 +3748,6 @@ function slashExt() {
   });
 }
 
-/** The user's chord for AI rewrite, in CodeMirror's spelling. */
-function currentAiRewriteKey(): string {
-  const combos = combosFor('editor.aiRewrite', settings.keybindings);
-  // Unbound: a key no chord produces, so the extension stays inert rather
-  // than falling back to ⌘J behind the user's back.
-  return combos.length ? toCodeMirrorKey(combos[0]) : 'F24';
-}
 
 function markdownExt() {
   // Use `markdownLanguage` as the base so GFM features (including task
@@ -4145,31 +3911,7 @@ function richExtensionsFor(tab: Tab) {
         liveBlocksExtension({
           getImageRoot: () => extractImageRoot(tab.content || ''),
           getFilePath: () => tab.filePath,
-          // F7 — live tldraw whiteboard theme + writeback.
-          getBoardTheme: () => ({
-            colorScheme: settings.theme === 'dark' ? 'dark' : 'light',
-            locale: settings.language || 'en',
-          }),
-          getTabId: () => tab.id,
-          // #354 — diagrams follow the app's light/dark family, like preview.
-          getMermaidTheme: () => mermaidThemeFor(settings.theme),
-          getPlantuml: () => ({
-            enabled: settings.plantumlEnabled,
-            server: settings.plantumlServer,
-          }),
-          // #353 — "Always show Markdown markers": keep every block's source.
-          keepSource: () => settings.alwaysShowMarkers,
-          getBoardStrings: () => ({
-            loading: t('whiteboard.loading'),
-            openFull: t('whiteboard.openFull'),
-            loadFailed: t('whiteboard.loadFailed'),
-          }),
-          onBoardEdit: (boardId, snapshotJson) => {
-            const cur = tabs.tabs.find((x) => x.id === tab.id);
-            if (!cur) return;
-            const next = replaceBoardSnapshot(cur.content || '', boardId, snapshotJson);
-            if (next !== cur.content) tabs.setContent(tab.id, next);
-          },
+          
         }),
         liveBlocksTheme,
       ], { showMarkers: settings.alwaysShowMarkers }),
@@ -4297,8 +4039,7 @@ function buildExtensions() {
     ...(!windowsImeSafeMode && props.tab.language === 'markdown' && !markdownSafeMode
       ? [
           tagAutocompleteExtension(),
-          citationsExtension(() => cachedCitations),
-          // #297 — opens itself on the third backtick of a fence opener.
+                    // #297 — opens itself on the third backtick of a fence opener.
           fenceLanguageExtension(() => settings.fenceLanguageSuggestions),
           // Single autocompletion config combining all 4 markdown sources
           // (wikilinks `[[`, tags `#`, citations `@`, fence languages ```).
@@ -4307,8 +4048,7 @@ function buildExtensions() {
             override: [
               wikilinkComplete,
               tagComplete,
-              citationCompleteSource(() => cachedCitations),
-              fenceLanguageComplete,
+                            fenceLanguageComplete,
             ],
             defaultKeymap: true,
             // Typing-triggered completion is the last remaining source of
@@ -4318,13 +4058,11 @@ function buildExtensions() {
             // and only for the keystroke that opens a fence.)
             activateOnTyping: false,
           }),
-          ...(IS_APP_STORE_BUILD ? [] : [aiKeyCompartment.of(aiRewriteExtension(currentAiRewriteKey()))]),
-          // Hunspell steps back while LanguageTool handles spelling, and
+                    // Hunspell steps back while LanguageTool handles spelling, and
           // takes over again if the LanguageTool server goes away.
-          spellcheckExtension({ enabled: () => settings.spellcheckEnabled && !languagetoolCoversSpelling() }),
+          spellcheckExtension({ enabled: () => settings.spellcheckEnabled }),
           spellcheckTheme,
-          languagetoolExtension({ enabled: () => settings.ltMode !== 'off' }),
-          slashCompartment.of(slashExt()),
+                    slashCompartment.of(slashExt()),
         ]
       : []),
     foldCompartment.of(foldExtensionFor(settings.foldingEnabled)),
@@ -4406,11 +4144,8 @@ onMounted(() => {
   window.addEventListener('solomd:editor-command', onEditorCommand as EventListener);
   window.addEventListener('solomd:editor-history', onEditorHistory as EventListener);
   window.addEventListener('keydown', onPlainWindowKeydown);
-  window.addEventListener('focus', syncSystemClipboardToVimRegister);
-  void syncSystemClipboardToVimRegister();
-  cleanupTransformCase = () => {
-    window.removeEventListener('focus', syncSystemClipboardToVimRegister);
-    window.removeEventListener('keydown', onPlainWindowKeydown);
+    cleanupTransformCase = () => {
+        window.removeEventListener('keydown', onPlainWindowKeydown);
     window.removeEventListener('solomd:editor-history', onEditorHistory as EventListener);
     window.removeEventListener('solomd:transform-case', onTransformCase as EventListener);
     window.removeEventListener('solomd:format-markdown', onFormatMarkdown as EventListener);
@@ -4906,72 +4641,14 @@ function openFind(replace = false): void {
  * internals, so the same code serves CodeMirror and the Windows plain
  * textarea; only the write-back differs.
  */
-function openTableAtCursor(): void {
-  const source = usePlainWindowsEditor ? plainText.value || '' : view?.state.doc.toString() ?? '';
-  if (!source) {
-    toasts.info(t('tableEditor.notInTable'));
-    return;
-  }
-  const lines = source.split('\n');
-  const caret = usePlainWindowsEditor
-    ? plainCaretOffset()
-    : view
-      ? view.state.selection.main.head
-      : 0;
-
-  // Offset → line index, plus each line's start offset for the reverse trip.
-  const starts: number[] = [];
-  let off = 0;
-  for (const line of lines) {
-    starts.push(off);
-    off += line.length + 1;
-  }
-  let caretLine = 0;
-  for (let i = 0; i < starts.length; i++) {
-    if (starts[i] <= caret) caretLine = i;
-    else break;
-  }
-
-  const span = findTableSpan(lines, caretLine);
-  if (!span) {
-    toasts.info(t('tableEditor.notInTable'));
-    return;
-  }
-  const from = starts[span.startLine];
-  const to = starts[span.endLine] + lines[span.endLine].length;
-
-  openTableEditor({
-    source: source.slice(from, to),
-    apply: (markdown: string) => replaceDocRange(from, to, markdown),
-  });
-}
+function openTableAtCursor(): void {}
 
 /**
  * Open the formula editor on the math under the caret, or on an empty formula
  * when the caret is not in one — "insert a formula" and "fix this formula" are
  * the same action from the user's side.
  */
-function openFormulaAtCursor(): void {
-  const source = usePlainWindowsEditor ? plainText.value || '' : view?.state.doc.toString() ?? '';
-  const caret = usePlainWindowsEditor
-    ? plainCaretOffset()
-    : view
-      ? view.state.selection.main.head
-      : 0;
-  const span = findMathSpanAt(source, caret);
-  const from = span ? span.from : caret;
-  const to = span ? span.to : caret;
-
-  openFormulaEditor({
-    latex: span?.body ?? '',
-    // A new formula defaults to inline; that is the common case, and the
-    // dialog has a one-click switch for the other one.
-    display: span?.display ?? false,
-    labels: collectLabels(source),
-    apply: (latex: string, display: boolean) =>
-      replaceDocRange(from, to, formatMath(source, from, to, latex, display)),
-  });
-}
+function openFormulaAtCursor(): void {}
 
 /**
  * Wrap a formula in the right delimiters for where it sits.
@@ -4979,51 +4656,6 @@ function openFormulaAtCursor(): void {
  * A display formula gets its own lines only when nothing else shares them.
  * Turning `Inline $E=mc^2$ here.` into a three-line `$$` block would split the
  * sentence across the formula — the mid-sentence case has to stay on one line.
- */
-function formatMath(
-  source: string,
-  from: number,
-  to: number,
-  latex: string,
-  display: boolean,
-): string {
-  if (!display) return `$${latex}$`;
-  const lineStart = source.lastIndexOf('\n', Math.max(0, from - 1)) + 1;
-  const lineEndIdx = source.indexOf('\n', to);
-  const lineEnd = lineEndIdx < 0 ? source.length : lineEndIdx;
-  const alone =
-    source.slice(lineStart, from).trim() === '' && source.slice(to, lineEnd).trim() === '';
-  return alone ? `$$\n${latex}\n$$` : `$$${latex}$$`;
-}
-
-/** Caret offset in the plain editor, in whole-document coordinates. */
-function plainCaretOffset(): number {
-  if (plainLiveEnabled.value) {
-    const block = plainBlocks.value[plainActiveBlock.value];
-    const el = plainBlockEditors.value[plainActiveBlock.value];
-    return (block?.start ?? 0) + (el?.selectionStart ?? 0);
-  }
-  return plainEditor.value?.selectionStart ?? 0;
-}
-
-/** Replace a document range in whichever editor this pane is running. */
-function replaceDocRange(from: number, to: number, text: string): void {
-  if (usePlainWindowsEditor) {
-    const src = plainText.value || '';
-    recordPlainHistory();
-    applyPlainContent(src.slice(0, from) + text + src.slice(to), from + text.length);
-    return;
-  }
-  if (!view) return;
-  view.dispatch({ changes: { from, to, insert: text } });
-}
-
-/**
- * Heading folding, driven from the command palette / shortcuts.
- *
- * `level` only applies to `'level'`. The Windows source textarea is the one
- * path that cannot fold — a <textarea> has no way to hide a line — so it says
- * so instead of silently doing nothing.
  */
 function applyFold(action: 'toggle' | 'all' | 'none' | 'level', level = 2): void {
   if (!settings.foldingEnabled) {
@@ -5319,15 +4951,6 @@ watch(
   },
 );
 
-// #180 — a rebind in Settings reaches the open editor immediately; without
-// this the new chord would only work in editors opened afterwards.
-watch(
-  () => currentAiRewriteKey(),
-  (key) => {
-    if (IS_APP_STORE_BUILD) return;
-    view?.dispatch({ effects: aiKeyCompartment.reconfigure(aiRewriteExtension(key)) });
-  },
-);
 
 watch(
   () => JSON.stringify(settings.keybindings),

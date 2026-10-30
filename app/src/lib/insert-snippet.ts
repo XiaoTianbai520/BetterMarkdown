@@ -38,4 +38,4 @@ export function parseInsertSnippet(snippet: string): ParsedSnippet {
 
 /** The Insert > Mermaid template: a valid two-node flowchart with the first
  *  label selected. Shared by the native menu and the toolbar. */
-export const MERMAID_INSERT_SNIPPET = '\n```mermaid\ngraph TD\n  A[$|$Start$|$] --> B[End]\n```\n';
+export const MERMAID_INSERT_SNIPPET = "";

@@ -46,16 +46,9 @@ import {
 } from './image-resolve';
 import { renderMarkdown, extractImageRoot } from './markdown';
 import { findHtmlBlockEnd } from './html-live-render';
-import { openRenderedLink } from './link-open';
 import { parseImageAltSize } from './md-image-url';
 import { plantumlSvgUrl } from './plantuml';
-import { bindMermaidInteractions, initMermaid } from './mermaid-lazy';
 import { getKatex, onRenderDepsChange, renderDepsVersion } from './render-deps';
-import {
-  parseTldrawFence,
-  TLDRAW_DEFAULT_HEIGHT,
-  type BoardThemeTokens,
-} from './tldraw-board';
 
 // v4.3.0 issue #57a — live-render math + Mermaid blocks in the editor.
 // Mermaid is async; we render lazily into a counter-keyed cache so the
@@ -68,46 +61,6 @@ import {
 // all but vanished. The theme now comes from the editor (same mapping as
 // preview), and it's part of the key, so switching theme renders fresh SVG
 // instead of reusing the light one.
-type MermaidTheme = 'dark' | 'default';
-const mermaidSvgCache = new Map<
-  string,
-  { svg: string | null; bindFunctions?: ((el: Element) => void) | null; error: string | null }
->();
-let mermaidIdSeq = 0;
-const mermaidKey = (source: string, theme: MermaidTheme) => `${theme}\u0000${source}`;
-// In-flight renders. A second caller has to wait for the same render, not
-// return straight away: the widget's toDOM relies on the promise resolving
-// only once the SVG is in the cache, to trigger the rebuild that swaps the
-// "Rendering…" placeholder for the diagram. Returning early made that rebuild
-// run before the render finished, and the placeholder stayed for good.
-const mermaidInflight = new Map<string, Promise<void>>();
-function ensureMermaidRendered(source: string, theme: MermaidTheme): Promise<void> {
-  const key = mermaidKey(source, theme);
-  const pending = mermaidInflight.get(key);
-  if (pending) return pending;
-  if (mermaidSvgCache.has(key)) return Promise.resolve();
-  // Reserve the slot first so concurrent calls don't double-render.
-  mermaidSvgCache.set(key, { svg: null, error: null });
-  const job = (async () => {
-    try {
-      const id = `cm-mmd-${++mermaidIdSeq}`;
-      const mermaid = await initMermaid({
-        startOnLoad: false,
-        securityLevel: 'strict',
-        theme,
-      });
-      const { svg, bindFunctions } = await mermaid.render(id, source);
-      mermaidSvgCache.set(key, { svg, bindFunctions, error: null });
-    } catch (e) {
-      mermaidSvgCache.set(key, { svg: null, error: (e as Error).message });
-    } finally {
-      mermaidInflight.delete(key);
-    }
-  })();
-  mermaidInflight.set(key, job);
-  return job;
-}
-
 // `^\s*!\[<alt>\](<url>)\s*$` — whole-line image with no surrounding prose.
 // Why whole-line: replacing inline images would split text in the middle and
 // break the natural reading flow of the source. We only collapse images that
@@ -539,70 +492,6 @@ function inlineMathSpans(text: string): Array<{ start: number; end: number; tex:
 // into a module-level cache; toDOM() pulls the SVG when available, falls
 // back to a "rendering…" placeholder, then dispatches `solomd:cm-relayout`
 // to ask the editor to rebuild decorations once the cache fills.
-class MermaidWidget extends WidgetType {
-  /** Whether the cache held a finished result when this widget was built. */
-  private readonly settled: boolean;
-  private readonly source: string;
-  private readonly theme: MermaidTheme;
-  private readonly filePath?: string;
-
-  constructor(source: string, theme: MermaidTheme, filePath?: string) {
-    super();
-    this.source = source;
-    this.theme = theme;
-    this.filePath = filePath;
-    const cached = mermaidSvgCache.get(mermaidKey(source, theme));
-    this.settled = !!(cached && (cached.svg || cached.error));
-  }
-
-  eq(other: MermaidWidget): boolean {
-    // A theme change must remount the widget with the other theme's SVG. So
-    // must the render finishing: if the placeholder and the finished widget
-    // compared equal, CodeMirror would keep the "Rendering…" DOM.
-    return (
-      other.source === this.source &&
-      other.theme === this.theme &&
-      other.filePath === this.filePath &&
-      other.settled === this.settled
-    );
-  }
-
-  toDOM(): HTMLElement {
-    const wrap = document.createElement('div');
-    wrap.className = 'cm-live-block cm-live-block--mermaid';
-    const cached = mermaidSvgCache.get(mermaidKey(this.source, this.theme));
-    if (cached?.svg) {
-      wrap.innerHTML = cached.svg;
-      bindMermaidInteractions(wrap, cached.bindFunctions);
-      wrap.addEventListener('click', (ev) => {
-        const anchor = (ev.target as Element | null)?.closest?.('a');
-        if (anchor) {
-          openRenderedLink(anchor, ev, this.filePath);
-        }
-      });
-    } else if (cached?.error) {
-      wrap.classList.add('cm-live-block--broken');
-      wrap.textContent = `Mermaid: ${cached.error}`;
-    } else {
-      wrap.textContent = '⌛ Rendering Mermaid…';
-      ensureMermaidRendered(this.source, this.theme).then(() => {
-        // Ask the field to recompute now that the SVG cache is filled. We
-        // can't hold an EditorView here (block decorations live in a state
-        // field, built without a view), so signal via a window event that
-        // the companion relayout plugin turns into a `relayoutEffect`.
-        try {
-          window.dispatchEvent(new CustomEvent('solomd:cm-relayout'));
-        } catch {}
-      });
-    }
-    return wrap;
-  }
-
-  ignoreEvent(): boolean {
-    return false;
-  }
-}
-
 // v4.10 issue #163 — ```plantuml fence rendered via the configured PlantUML
 // server (opt-in; see lib/plantuml.ts for the privacy story). Same reveal
 // model as mermaid/tables: cursor inside → source. The <img> reports its
@@ -655,213 +544,16 @@ class PlantumlWidget extends WidgetType {
 // without the dep. Edits debounce 350ms inside the adapter, then splice ONLY
 // the fence body back through the writeback callback (→ tabs.setContent),
 // exactly like Tolaria's onSnapshotChange → tldrawMarkdown round-trip.
-class TldrawWidget extends WidgetType {
-  private readonly boardId: string;
-  private readonly height: string;
-  private readonly width: string;
-  private readonly snapshot: string;
-  private readonly opts: BlockOptions;
-
-  constructor(
-    boardId: string,
-    height: string,
-    width: string,
-    snapshot: string,
-    opts: BlockOptions,
-  ) {
-    super();
-    this.boardId = boardId;
-    this.height = height;
-    this.width = width;
-    this.snapshot = snapshot;
-    this.opts = opts;
-  }
-
-  // Re-mount only when the board IDENTITY or stored snapshot changes — NOT on
-  // every keystroke elsewhere in the doc. This is what makes the always-render
-  // model viable: a relayout that doesn't touch this fence reuses the same
-  // widget DOM (eq → true) so the tldraw instance is never torn down (avoids
-  // the canvas remounting on every keystroke near it, per the plan's risks).
-  eq(other: TldrawWidget): boolean {
-    return (
-      other.boardId === this.boardId &&
-      other.height === this.height &&
-      other.width === this.width &&
-      other.snapshot === this.snapshot
-    );
-  }
-
-  toDOM(): HTMLElement {
-    const wrap = document.createElement('div');
-    wrap.className = 'cm-live-block cm-live-block--tldraw';
-    wrap.setAttribute('data-board-id', this.boardId);
-    // Bordered card lives one level down so the wrap's padding (the old
-    // inter-block margin, see #155) stays outside the border.
-    const card = document.createElement('div');
-    card.className = 'cm-tldraw-card';
-    const h = parseInt(this.height, 10);
-    card.style.height = `${Number.isFinite(h) && h > 0 ? h : 520}px`;
-    if (this.width) card.style.maxWidth = `${this.width}px`;
-    wrap.appendChild(card);
-
-    // Overflow toolbar: a fullscreen toggle that pops the board into the
-    // WhiteboardOverlay (full-window editor). The board id + current snapshot
-    // are handed off so the overlay edits the SAME fence.
-    const toolbar = document.createElement('div');
-    toolbar.className = 'cm-tldraw-toolbar';
-    const strings = this.opts.getBoardStrings?.() ?? {
-      loading: 'Loading whiteboard…',
-      openFull: 'Open fullscreen',
-      loadFailed: 'Whiteboard failed to load',
-    };
-    const fullBtn = document.createElement('button');
-    fullBtn.className = 'cm-tldraw-fullscreen';
-    fullBtn.type = 'button';
-    fullBtn.title = strings.openFull;
-    fullBtn.setAttribute('aria-label', strings.openFull);
-    fullBtn.textContent = '⛶';
-    fullBtn.addEventListener('mousedown', (ev) => ev.preventDefault());
-    fullBtn.addEventListener('click', (ev) => {
-      ev.preventDefault();
-      ev.stopPropagation();
-      const handle = (wrap as unknown as { __boardHandle?: { getSnapshotString(): string } })
-        .__boardHandle;
-      const snap = handle?.getSnapshotString?.() ?? this.snapshot;
-      window.dispatchEvent(
-        new CustomEvent('solomd:whiteboard-open', {
-          detail: {
-            boardId: this.boardId,
-            tabId: this.opts.getTabId?.() ?? '',
-            snapshot: snap,
-          },
-        }),
-      );
-    });
-    toolbar.appendChild(fullBtn);
-    card.appendChild(toolbar);
-
-    const surface = document.createElement('div');
-    surface.className = 'cm-tldraw-surface';
-    card.appendChild(surface);
-
-    const placeholder = document.createElement('div');
-    placeholder.className = 'cm-tldraw-loading';
-    const spinner = document.createElement('span');
-    spinner.className = 'cm-tldraw-spinner';
-    spinner.setAttribute('aria-hidden', 'true');
-    const loadingLabel = document.createElement('span');
-    loadingLabel.textContent = strings.loading;
-    placeholder.append(spinner, loadingLabel);
-    surface.appendChild(placeholder);
-
-    // Mount asynchronously — the adapter dynamic-imports tldraw on first use.
-    const theme: BoardThemeTokens = this.opts.getBoardTheme?.() ?? {
-      colorScheme: 'light',
-      locale: 'en',
-    };
-    const boardId = this.boardId;
-    let destroyed = false;
-    void import('./tldraw-runtime')
-      .then(({ mountBoard }) =>
-        mountBoard(surface, {
-          snapshot: this.snapshot,
-          theme,
-          onSnapshotChange: (snapshotJson) => {
-            // Splice the new snapshot back into the note's Markdown. We resolve
-            // the fence by board id at write time (positions drift as the doc
-            // is edited), keeping height/width attributes intact.
-            this.opts.onBoardEdit?.(boardId, snapshotJson);
-          },
-        }),
-      )
-      .then((handle) => {
-        if (destroyed) {
-          handle.destroy();
-          return;
-        }
-        placeholder.remove();
-        (wrap as unknown as { __boardHandle?: unknown }).__boardHandle = handle;
-        // Expose the live board instance for the dev-bridge self-test.
-        try {
-          const reg =
-            ((window as any).__solomdBoards ||= new Map<string, unknown>());
-          reg.set(boardId, handle);
-        } catch {
-          /* dev-only */
-        }
-      })
-      .catch((e) => {
-        placeholder.className = 'cm-tldraw-loading cm-live-block--broken';
-        placeholder.textContent = `${strings.loadFailed}: ${(e as Error).message}`;
-      });
-
-    // Stash a teardown hook the widget's destroy() path can call.
-    (wrap as unknown as { __destroyBoard?: () => void }).__destroyBoard = () => {
-      destroyed = true;
-      const handle = (wrap as unknown as { __boardHandle?: { destroy(): void } })
-        .__boardHandle;
-      try {
-        handle?.destroy();
-      } catch {
-        /* already gone */
-      }
-      try {
-        (window as any).__solomdBoards?.delete(boardId);
-      } catch {
-        /* dev-only */
-      }
-    };
-
-    return wrap;
-  }
-
-  destroy(dom: HTMLElement): void {
-    // CM calls destroy() when the widget DOM is removed (relayout / unmount).
-    // Tear down the tldraw React root so we don't leak an editor per relayout.
-    (dom as unknown as { __destroyBoard?: () => void }).__destroyBoard?.();
-  }
-
-  // The board owns all pointer/keyboard interaction inside its canvas — let
-  // those events through to tldraw rather than routing them to CodeMirror.
-  ignoreEvent(): boolean {
-    return true;
-  }
-}
-
 interface BlockOptions {
   /** Workspace context for resolving relative image paths. */
   getImageRoot?: () => string | null;
   /** Active note's filesystem path so relative paths resolve to its dir. */
   getFilePath?: () => string | undefined;
-  /** Theme/locale tokens handed to a mounted tldraw board (F7). */
-  getBoardTheme?: () => BoardThemeTokens;
-  /** Active tab id — the fullscreen overlay writes edits back to it (F7). */
-  getTabId?: () => string;
-  /**
-   * F7 writeback: a whiteboard's snapshot changed. `snapshotJson` is the fresh
-   * pretty-printed body to splice into the ```tldraw fence with `boardId`.
-   */
-  onBoardEdit?: (boardId: string, snapshotJson: string) => void;
-  /**
-   * F7 i18n: localized strings for the inline board chrome (loading text,
-   * fullscreen button tooltip, load-failure prefix). Optional — sensible
-   * English fallbacks are used when absent so the widget never shows a raw key.
-   */
-  getBoardStrings?: () => { loading: string; openFull: string; loadFailed: string };
-  /**
-   * #354 — Mermaid theme for the current app theme ('dark' for any dark
-   * theme). Absent → 'default'. A change takes effect on the next rebuild;
-   * the editor dispatches a relayout when the theme changes.
-   */
-  getMermaidTheme?: () => 'dark' | 'default';
   /** v4.10 #163 — PlantUML opt-in + server; absent/disabled → fences stay source. */
   getPlantuml?: () => { enabled: boolean; server: string };
   /**
    * #353 "Always show Markdown markers": the source stays visible whatever the
    * caret does, so nothing collapses and nothing jumps when a line is clicked.
-   * Images still render, as a block below their own (visible) source line;
-   * tables, math, HTML blocks and diagrams keep their source. tldraw boards
-   * are unaffected — they never reveal source anyway.
    */
   keepSource?: () => boolean;
 }
@@ -1102,91 +794,6 @@ function buildBlockDecorations(state: EditorState, opts: BlockOptions): Decorati
             }
           }
 
-          // v4.6 F7 — ```tldraw fenced whiteboard. The fence carries
-          // id/height/width attributes and a variable-length backtick run
-          // (3+, grown past backticks inside the JSON). Unlike every other
-          // block here there is NO cursor-inside gating: the board always
-          // replaces the fence (the JSON is never hand-edited), so the canvas
-          // stays mounted while you type around it.
-          const tldrawOpen = /^\s*(`{3,})\s*tldraw\b([^\n]*)$/i.exec(line.text);
-          if (tldrawOpen) {
-            const ticks = tldrawOpen[1].length;
-            const closeRe = new RegExp(`^\\s*\`{${ticks},}\\s*$`);
-            let endI = i + 1;
-            while (endI <= lastLine && !closeRe.test(doc.line(endI).text)) {
-              endI += 1;
-            }
-            if (endI <= lastLine) {
-              const info = `tldraw${tldrawOpen[2]}`;
-              let body = '';
-              for (let k = i + 1; k < endI; k++) {
-                body += (k > i + 1 ? '\n' : '') + doc.line(k).text;
-              }
-              const fence = parseTldrawFence(info, body) ?? {
-                boardId: '',
-                height: TLDRAW_DEFAULT_HEIGHT,
-                width: '',
-                snapshot: body.trim(),
-              };
-              const blockFrom = doc.line(i).from;
-              const blockTo = doc.line(endI).to;
-              builder.add(
-                blockFrom,
-                blockTo,
-                Decoration.replace({
-                  widget: new TldrawWidget(
-                    fence.boardId,
-                    fence.height,
-                    fence.width,
-                    fence.snapshot,
-                    opts,
-                  ),
-                  block: true,
-                }),
-              );
-              i = endI + 1;
-              continue;
-            }
-          }
-
-          // v4.3.0 issue #57a — ```mermaid fenced block. Pre-render to SVG
-          // via the mermaid cache; the widget waits for the SVG and asks
-          // CM to rebuild decorations once ready.
-          if (/^\s*```\s*mermaid\s*$/i.test(line.text)) {
-            let endI = i + 1;
-            while (endI <= lastLine) {
-              const next = doc.line(endI);
-              if (/^\s*```\s*$/.test(next.text)) break;
-              endI += 1;
-            }
-            if (endI <= lastLine) {
-              const cursorInside = keepSource || (cursorLine >= i && cursorLine <= endI);
-              const cursorInsideEnd = cursorLineEnd >= i && cursorLineEnd <= endI;
-              if (!cursorInside && !cursorInsideEnd) {
-                // Body is between the opening and closing fence.
-                let body = '';
-                for (let k = i + 1; k < endI; k++) {
-                  body += (k > i + 1 ? '\n' : '') + doc.line(k).text;
-                }
-                const blockFrom = doc.line(i).from;
-                const blockTo = doc.line(endI).to;
-                // Kick off async render outside the build loop.
-                const mermaidTheme = opts.getMermaidTheme?.() ?? 'default';
-                ensureMermaidRendered(body, mermaidTheme);
-                builder.add(
-                  blockFrom,
-                  blockTo,
-                  Decoration.replace({
-                    widget: new MermaidWidget(body, mermaidTheme, opts.getFilePath?.()),
-                    block: true,
-                  }),
-                );
-              }
-              i = endI + 1;
-              continue;
-            }
-          }
-
           // v4.10 issue #163 — ```plantuml / ```puml fence (opt-in).
           const plantumlCfg = opts.getPlantuml?.();
           if (
@@ -1359,7 +966,6 @@ export function liveBlocksExtension(opts: BlockOptions = {}) {
       // tldraw boards never reveal their source (no cursor-inside gating in
       // buildBlockDecorations), so parking the caret inside one just hides
       // it — let the default motion hop over the fence instead.
-      if ((d.spec as { widget?: unknown }).widget instanceof TldrawWidget) return;
       const a = doc.lineAt(from).number;
       const b = doc.lineAt(to).number;
       const jumpedOver = forward
@@ -1411,7 +1017,6 @@ export function liveBlocksExtension(opts: BlockOptions = {}) {
     let retarget: number | null = null;
     deco.between(0, doc.length, (from, to, d) => {
       if (!(d.spec as { block?: boolean }).block) return;
-      if ((d.spec as { widget?: unknown }).widget instanceof TldrawWidget) return;
       const a = doc.lineAt(from).number;
       const b = doc.lineAt(to).number;
       const forwardHop = fromNo === a - 1 && toNo === b + 1;
@@ -1497,14 +1102,6 @@ export const liveBlocksTheme = EditorView.theme({
     overflowX: 'auto',
     textAlign: 'center',
   },
-  '.cm-live-block--mermaid': {
-    padding: '1.2em 0',
-    textAlign: 'center',
-  },
-  '.cm-live-block--mermaid svg': {
-    maxWidth: '100%',
-    height: 'auto',
-  },
   // v4.10 #163
   '.cm-live-block--plantuml': {
     padding: '1.2em 0',
@@ -1514,72 +1111,7 @@ export const liveBlocksTheme = EditorView.theme({
     maxWidth: '100%',
     height: 'auto',
   },
-  // v4.6 F7 — tldraw whiteboard card. A bordered surface hosting the live
-  // canvas; the inner `.cm-tldraw-surface` fills it so tldraw can measure.
-  // The bordered card is an inner element (`.cm-tldraw-card`) so the outer
-  // block can keep its measurable padding (#155) without the border growing
-  // around it.
-  '.cm-live-block--tldraw': {
-    width: '100%',
-  },
-  '.cm-tldraw-card': {
-    position: 'relative',
-    width: '100%',
-    border: '1px solid var(--border)',
-    borderRadius: '8px',
-    overflow: 'hidden',
-    background: 'var(--bg)',
-  },
-  '.cm-tldraw-surface': {
-    position: 'absolute',
-    inset: '0',
-  },
-  '.cm-tldraw-loading': {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: '8px',
-    height: '100%',
-    color: 'var(--text-faint)',
-    fontStyle: 'italic',
-    fontSize: '13px',
-  },
-  '.cm-tldraw-spinner': {
-    width: '14px',
-    height: '14px',
-    border: '2px solid var(--border)',
-    borderTopColor: 'var(--accent, var(--text-faint))',
-    borderRadius: '50%',
-    animation: 'cm-tldraw-spin 0.7s linear infinite',
-    flex: '0 0 auto',
-  },
-  '@keyframes cm-tldraw-spin': {
-    to: { transform: 'rotate(360deg)' },
-  },
-  '.cm-tldraw-toolbar': {
-    position: 'absolute',
-    top: '6px',
-    right: '6px',
-    zIndex: '5',
-    display: 'flex',
-    gap: '4px',
-  },
-  '.cm-tldraw-fullscreen': {
-    appearance: 'none',
-    border: '1px solid var(--border)',
-    background: 'var(--bg)',
-    color: 'var(--text)',
-    borderRadius: '6px',
-    width: '26px',
-    height: '26px',
-    lineHeight: '1',
-    cursor: 'pointer',
-    fontSize: '14px',
-    opacity: '0.85',
-  },
-  '.cm-tldraw-fullscreen:hover': {
-    opacity: '1',
-  },
+
 });
 
 // Re-exported helpers in case the editor wants to wire up the imageRoot

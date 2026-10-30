@@ -22,7 +22,6 @@
  * v2.5 — bonus feature from GitHub Discussion #30.
  */
 
-import { newBoardId } from './tldraw-markdown';
 
 export interface SlashBlock {
   /** Stable id, e.g. `h1`, `code`, `table`. Used for i18n keys + tests. */
@@ -158,27 +157,7 @@ export const SLASH_BLOCKS: SlashBlock[] = [
     snippet: '$${cursor}$',
     keywords: ['math', 'latex', 'inline', 'equation', 'tex'],
   },
-  {
-    id: 'mermaid',
-    icon: '◇',
-    label: 'Mermaid diagram',
-    hint: 'flowchart',
-    snippet:
-      '```mermaid\nflowchart TD\n  A[${cursor:Start}] --> B[End]\n```',
-    keywords: ['mermaid', 'diagram', 'flowchart', 'graph'],
-  },
-  {
-    id: 'whiteboard',
-    icon: '🖊',
-    label: 'Whiteboard',
-    hint: 'tldraw board',
-    // An empty ```tldraw fence with a fresh uuid. `${uuid}` is expanded to a
-    // new board id at insert time (see expandSnippet); the body is `{}` (a
-    // fresh empty board). The cursor lands on the blank line after the fence.
-    snippet: '```tldraw id="${uuid}" height="520" width=""\n{}\n```\n${cursor}',
-    keywords: ['whiteboard', 'tldraw', 'board', 'draw', 'canvas', 'sketch', 'diagram'],
-  },
-
+    
   // -------- Links + media --------
   {
     id: 'link',
@@ -278,7 +257,7 @@ export function expandSnippet(snippet: string, selection: string): ExpandedSnipp
   // collides.
   if (snippet.includes(UUID_TOKEN)) {
     while (snippet.includes(UUID_TOKEN)) {
-      snippet = snippet.replace(UUID_TOKEN, newBoardId());
+      snippet = snippet.replace(UUID_TOKEN, Date.now().toString(36));
     }
   }
 

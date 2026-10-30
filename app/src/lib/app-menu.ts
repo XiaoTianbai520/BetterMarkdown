@@ -90,11 +90,8 @@ export interface MenuState {
     neighborhood: boolean;
     tags: boolean;
     tasks: boolean;
-    types: boolean;
-    history: boolean;
-    savedViews: boolean;
-    agent: boolean;
-  };
+        history: boolean;
+          };
 }
 
 export interface MenuContext {
@@ -191,13 +188,8 @@ export function buildAppMenu(ctx: MenuContext): TopMenu[] {
       id: 'export',
       label: t('toolbar.export'),
       items: [
-        item('export.html', t('toolbar.exportHtml')),
-        item('export.docx', t('toolbar.exportDocx')),
-        // "PDF (text)" IS the system-print route (C1 listed it twice).
-        item('export.pdfPrint', t('toolbar.exportPdfPrint')),
-        item('export.pdf', t('toolbar.exportPdf')),
-        item('export.image', t('toolbar.exportImage')),
-        sep,
+        item('export.html', t('toolbar.exportHtml')),        // "PDF (text)" IS the system-print route (C1 listed it twice).
+        item('export.pdfPrint', t('toolbar.exportPdfPrint')),        sep,
         // Pandoc-based: they tell the user when Pandoc is not installed.
         item('export.epub', t('cmd.export.epub')),
         item('export.odt', t('cmd.export.odt')),
@@ -326,16 +318,11 @@ export function buildAppMenu(ctx: MenuContext): TopMenu[] {
     fmt('ol'), fmt('ul'), fmt('task'),
     sep,
     fmt('quote'), fmt('codeblock'),
-    sep,
-    item('editor.tableEditor', t('cmd.editor.tableEditor')),
-    item('editor.formulaEditor', t('cmd.editor.formulaEditor')),
-    sep,
+    sep,    sep,
     // "Insert …" here, "Edit current …" above: the menu has both, so each
     // label says which one it is.
     item('insert.table', t('menubar.insertTable')),
-    item('insert.mathBlock', t('menubar.insertMathBlock')),
-    item('insert.mermaid', t('menubar.insertMermaid')),
-    item('insert.hr', t('menubar.insertDivider')),
+    item('insert.mathBlock', t('menubar.insertMathBlock')),    item('insert.hr', t('menubar.insertDivider')),
   ];
 
   // ---- 格式 Format ----
@@ -397,9 +384,7 @@ export function buildAppMenu(ctx: MenuContext): TopMenu[] {
       ),
     },
     item('view.toggleLiveEdit', t('menubar.toggleLiveEdit')),
-    item('view.cycleView', t('menubar.cycleView')),
-    item('view.slideshow', t('cmd.view.slideshow')),
-    sep,
+    item('view.cycleView', t('menubar.cycleView')),    sep,
     item('view.toggleFileTree', t('menubar.toggleFileTree')),
     item('view.toggleRightSidebar', t('menubar.toggleRightSidebar')),
     {
@@ -413,13 +398,7 @@ export function buildAppMenu(ctx: MenuContext): TopMenu[] {
         item('view.relationships', t('menubar.paneRelationships'), { checked: state.panes.relationships }),
         item('view.toggleNeighborhood', t('menubar.paneNeighborhood'), { checked: state.panes.neighborhood }),
         item('view.toggleTagsPanel', t('menubar.paneTags'), { checked: state.panes.tags }),
-        item('view.toggleTasksPanel', t('menubar.paneTasks'), { checked: state.panes.tasks }),
-        item('view.toggleTypesPanel', t('menubar.paneTypes'), { checked: state.panes.types }),
-        item('view.toggleHistoryPanel', t('menubar.paneHistory'), { checked: state.panes.history }),
-        item('views.toggle', t('menubar.paneSavedViews'), { checked: state.panes.savedViews }),
-        // App Store builds ship without AI.
-        ...(ctx.aiAvailable ? [item('view.toggleAgentPanel', t('menubar.paneAgent'), { checked: state.panes.agent })] : []),
-        sep,
+        item('view.toggleTasksPanel', t('menubar.paneTasks'), { checked: state.panes.tasks }),        item('view.toggleHistoryPanel', t('menubar.paneHistory'), { checked: state.panes.history }),        // App Store builds ship without AI.        sep,
         item('view.resetSidebarPanes', t('menubar.resetSidebarPanes')),
       ],
     },

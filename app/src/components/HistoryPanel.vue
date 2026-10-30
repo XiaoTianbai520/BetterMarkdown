@@ -23,7 +23,6 @@ import { useWorkspaceStore } from '../stores/workspace';
 import { useGitHistoryStore, type CommitMeta, type DiffResult } from '../stores/gitHistory';
 import { useToastsStore } from '../stores/toasts';
 import { useI18n } from '../i18n';
-import GithubConflictPanel from './GithubConflictPanel.vue';
 import Icons from './Icons.vue';
 import PanelHeader from './panel/PanelHeader.vue';
 import { hasGitBackend } from '../lib/platform';
@@ -158,10 +157,6 @@ function timeAgo(unix: number): string {
       :count="!loading && commits.length > 0 ? commits.length : null"
       @close="emit('close')"
     />
-
-    <!-- v2.6 — GitHub sync conflict resolver. Sits above the commit list
-         when a pull surfaced merge conflicts; auto-hides when empty. -->
-    <GithubConflictPanel />
 
     <!-- 1. No folder open -->
     <div v-if="!folder" class="rp-empty">

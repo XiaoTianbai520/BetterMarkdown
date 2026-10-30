@@ -122,11 +122,6 @@ test('block math inside a fence is not replaced by MathWidget', () => {
   assert.deepEqual(hits, []);
 });
 
-test('a ```mermaid fence outside other fences still renders', () => {
-  const doc = ['intro', '', '```mermaid', 'graph TD; A-->B;', '```', ''].join('\n');
-  const hits = widgets(doc).filter((w) => w.widgetName === 'MermaidWidget');
-  assert.equal(hits.length, 1);
-});
 
 test('an unclosed fence keeps everything after it inert', () => {
   const doc = ['```html', '<div class="app">', '  <p>hi</p>', '</div>', ''].join('\n');

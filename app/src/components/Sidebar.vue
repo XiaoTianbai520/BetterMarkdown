@@ -17,7 +17,6 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue';
 import Icon from './Icons.vue';
 import FileTree from './FileTree.vue';
-import ViewsPanel from './ViewsPanel.vue';
 import SyncStatusPill from './SyncStatusPill.vue';
 import { useSettingsStore } from '../stores/settings';
 import { useWorkspaceStore } from '../stores/workspace';
@@ -398,10 +397,6 @@ onBeforeUnmount(() => {
           </button>
         </div>
       </div>
-    </div>
-
-    <div v-if="settings.showViewsPanel" class="sb__views">
-      <ViewsPanel />
     </div>
 
     <button

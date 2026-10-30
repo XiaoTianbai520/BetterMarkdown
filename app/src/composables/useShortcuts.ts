@@ -14,7 +14,6 @@ import { MARKDOWN_ONLY_COMMANDS, type EditorCommand } from '../lib/editor-comman
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { invoke } from '@tauri-apps/api/core';
 import { IS_APP_STORE_BUILD } from '../lib/app-build';
-import { tableEditor } from '../lib/table-editor-bus';
 
 interface Hooks {
   openPalette?: () => void;
@@ -142,7 +141,6 @@ export function useShortcuts(hooks: Hooks = {}) {
       FORMAT_KINDS.map((kind) => [`fmt.${kind}`, () => formatMarkdown(kind)]),
     ),
     'format.markdown': () => runById('format.markdown'),
-    'editor.tableEditor': () => runById('editor.tableEditor'),
     'editor.formulaEditor': () => runById('editor.formulaEditor'),
     'export.copyHtml': () => void exporter.copyAsHtml(),
     'export.copyWord': () => void exporter.copyAsWord(),
@@ -264,15 +262,6 @@ export function useShortcuts(hooks: Hooks = {}) {
     const bindings = resolveBindings(settings.keybindings);
     const actionId = bindings.get(combo);
     if (!actionId) return;
-    // Includes keys from the teleported close-confirmation dialog and the
-    // Windows IME keyup fallback. Leave the table's source note/view intact.
-    if (tableEditor.session) {
-      e.preventDefault();
-      if (actionId === 'file.closeTab') {
-        window.dispatchEvent(new Event('solomd:table-close-request'));
-      }
-      return;
-    }
     // A chord CodeMirror's own keymap already handled (it calls
     // preventDefault) belongs to the editor: ⌘⇧Z redoing *and* starting a
     // Pomodoro session, AI rewrite opening its overlay twice. Only file /

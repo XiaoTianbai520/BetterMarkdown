@@ -6,7 +6,7 @@
  * editor area. Clicking it opens a popover with everything the status bar
  * used to show: caret position, line / word / CJK / character counts, the
  * selection count, encoding, line endings, language, today's workspace total,
- * and the status bar's other tenants — writing goals, the pomodoro timer, the
+ * and the status bar's other tenants — the pomodoro timer, the
  * sync status and the inbox toggle — so nothing that lived down there is lost.
  *
  * Mounted inside `.content` (position: relative); positions itself absolutely.
@@ -23,7 +23,6 @@ import { cjkWordCount } from '../lib/chinese';
 import { useInbox } from '../composables/useInbox';
 import { useI18n } from '../i18n';
 import Icon from './Icons.vue';
-import WritingGoals from './WritingGoals.vue';
 import PomodoroPill from './PomodoroPill.vue';
 import SyncStatusPill from './SyncStatusPill.vue';
 
@@ -213,7 +212,6 @@ watch(
       <!-- The status bar's other tenants. Each renders nothing when it has
            nothing to say, so the strip only appears when one of them does. -->
       <div class="stats-pop__extras">
-        <WritingGoals v-if="settings.showWritingStats" />
         <PomodoroPill v-if="pomodoro.active" />
         <SyncStatusPill />
         <button
