@@ -11,6 +11,12 @@
 > - **精简权限与系统安全**：保留基础网络权限（`android.permission.INTERNET`，仅用于渲染 Markdown 文档中的远程外部图片）；绝不申请敏感存储权限（无需 `READ_EXTERNAL_STORAGE` / `MANAGE_EXTERNAL_STORAGE`），原生通过 Android 系统存储访问框架（Storage Access Framework, SAF）安全、合规地读写用户授权目录与文件。
 > - **极致编译体积优化**：Rust 底层开启最高规格 release 优化（`opt-level = "z"`, `lto = "fat"`, `strip = "symbols"`），并去除无用 JNI/静态库引用，生成极致精炼的 `libapp_lib.so` 原生库。
 
+> [!IMPORTANT]
+> **产品需求与架构基线约束**
+>
+> 本项目的核心定位、功能矩阵、严格边界（不做什么）与体验优化量化指标已正式固化于 [docs/PRD-1.0.md](docs/PRD-1.0.md)。
+> 后续所有功能迭代、重构与体验优化，均必须严格以该 PRD 为最高约束基准，严防功能蔓延。
+
 [![License: MIT](https://img.shields.io/github/license/XiaoTianbai520/BetterMarkdown?color=orange)](LICENSE)
 [![Platform: Android](https://img.shields.io/badge/platform-Android%207.0%2B%20(API%2024%2B)-green.svg)](app/)
 
