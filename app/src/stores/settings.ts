@@ -54,6 +54,8 @@ interface Settings {
   // behavior of resuming whatever mode the user left in.
   startupViewMode: ViewMode | null;
   fontSize: number;
+  lineHeight: number;
+  autoSaveInterval: number;
   fontFamily: string;
   wordWrap: boolean;
   showLineNumbers: boolean;
@@ -137,7 +139,7 @@ interface Settings {
    *  'native' without this flag is not a choice and becomes 'auto'. */
   windowsEditorEngineExplicit: boolean;
   uiFontSize: number;
-  language: 'en' | 'zh';
+  language: 'auto' | 'en' | 'zh';
   autoCheckUpdate: boolean;
   // Preview layout
   previewFitWidth: boolean;
@@ -628,6 +630,8 @@ function defaults(): Settings {
     viewMode: 'liveEdit',
     startupViewMode: null,
     fontSize: 16,
+    lineHeight: 1.6,
+    autoSaveInterval: 10,
     fontFamily: DEFAULT_EDITOR_FONT,
     wordWrap: true,
     showLineNumbers: false,
@@ -1119,6 +1123,14 @@ export const useSettingsStore = defineStore('settings', {
       this.readingByDefaultOnMobile = !this.readingByDefaultOnMobile;
       this.persist();
     },
+    setLineHeight(val: number) {
+      this.lineHeight = Math.max(1.0, Math.min(3.0, val));
+      this.persist();
+    },
+    setAutoSaveInterval(sec: number) {
+      this.autoSaveInterval = Math.max(0, sec);
+      this.persist();
+    },
     setFontSize(n: number) {
       this.fontSize = Math.max(10, Math.min(28, n));
       // #133 — the Settings "字号 / Font size" slider is the single base size
@@ -1541,7 +1553,7 @@ export const useSettingsStore = defineStore('settings', {
       this.uiFontSize = Math.max(10, Math.min(20, n));
       this.persist();
     },
-    setLanguage(lang: 'en' | 'zh') {
+    setLanguage(lang: 'auto' | 'en' | 'zh') {
       this.language = lang;
       this.persist();
     },

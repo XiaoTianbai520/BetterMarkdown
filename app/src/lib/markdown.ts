@@ -90,7 +90,6 @@ export const md = new MarkdownIt({
     // and must keep the `language-mermaid` class untouched. Return '' so
     // markdown-it falls through to its default HTML-escape path for this
     // lang; the class is still emitted via langPrefix on the <code> tag.
-    if (lang === 'mermaid') return '';
     // Not loaded yet (render-deps.ts): plain escaped code now, colours on the
     // re-render that follows the load.
     const hl = getHljs();
@@ -274,7 +273,7 @@ md.renderer.rules.fence = function (tokens, idx, options, env, self) {
   const tok = tokens[idx];
   const info = (tok.info || '').trim().toLowerCase();
   const lang = info.split(/\s+/)[0];
-  if (lang === 'mermaid' || lang === 'tldraw') return html;
+  if (lang === 'tldraw') return html;
   // Inject .cb-line wrappers on each line. We do this on the rendered HTML
   // because the highlight has already produced <span class="hljs-..."> spans
   // that may straddle multiple lines (a few hljs grammars emit multi-line

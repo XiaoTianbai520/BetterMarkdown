@@ -122,6 +122,31 @@ function firstMatch(query: ReturnType<typeof getSearchQuery>, view: EditorView, 
   return wrapped.done ? null : wrapped.value;
 }
 
+
+function scrollCursorIntoVisualView() {
+  if (!view) return;
+  const vv = window.visualViewport;
+  if (!vv) return;
+
+  const coveredStr = getComputedStyle(document.documentElement).getPropertyValue('--kb-covered-bottom');
+  const covered = parseFloat(coveredStr) || 0;
+
+  const scroller = view.scrollDOM;
+  if (!scroller) return;
+
+  if (view.hasFocus) {
+    const sel = view.state.selection.main;
+    const coords = view.coordsAtPos(sel.head);
+    if (!coords) return;
+
+    const bottomLimit = vv.offsetTop + vv.height - (covered > 0 ? 44 : 16);
+    if (coords.bottom > bottomLimit) {
+      const scrollNeeded = coords.bottom - bottomLimit + 24;
+      scroller.scrollTop += scrollNeeded;
+    }
+  }
+}
+
 const incrementalFindScroll = EditorView.updateListener.of((update) => {
   if (!update.transactions.some((tr) => tr.effects.some((e) => e.is(setSearchQuery)))) return;
   const query = getSearchQuery(update.state);
@@ -3931,13 +3956,16 @@ function richExtensionsFor(tab: Tab) {
     : richHighlightOnly();
 }
 
-const fontSizeTheme = (px: number, family: string) =>
+const fontSizeTheme = (px: number, family: string, lineHeight = settings.lineHeight || 1.6) =>
   EditorView.theme({
     '&': { fontSize: `${px}px`, height: '100%' },
-    // 5.0 §5 — body 16/1.8 (the size is the user's; 1.8 is CJK-comfortable),
-    // 20px above the first line (#435, #440), room to scroll the last line up to the eye.
-    '.cm-scroller': { fontFamily: buildEditorFontStack(family), lineHeight: '1.8' },
-    '.cm-content': { padding: '20px 32px 30vh', caretColor: 'var(--accent)' },
+    '.cm-scroller': {
+      fontFamily: buildEditorFontStack(family),
+      lineHeight: `${lineHeight}`,
+      paddingBottom: 'calc(var(--kb-covered-bottom, 0px) + 80px)',
+      boxSizing: 'border-box',
+    },
+    '.cm-content': { padding: '20px 24px 30vh', caretColor: 'var(--accent)' },
     '.cm-gutters': {
       backgroundColor: 'transparent',
       border: 'none',
@@ -4105,6 +4133,9 @@ function buildExtensions() {
         const sel = u.state.selection.main;
         emit('selection', sel.empty ? '' : u.state.sliceDoc(sel.from, sel.to));
       }
+      if (u.selectionSet || u.docChanged) {
+        requestAnimationFrame(scrollCursorIntoVisualView);
+      }
     }),
   ];
 }
@@ -4226,7 +4257,15 @@ onMounted(() => {
   const onRelayout = () => view?.requestMeasure();
   window.addEventListener('solomd:relayout', onRelayout);
   window.addEventListener('solomd:flush-content-sync', flushContentSync);
+  if (window.visualViewport) {
+    window.visualViewport.addEventListener('resize', scrollCursorIntoVisualView);
+    window.visualViewport.addEventListener('scroll', scrollCursorIntoVisualView);
+  }
   cleanupRelayout = () => {
+    if (window.visualViewport) {
+      window.visualViewport.removeEventListener('resize', scrollCursorIntoVisualView);
+      window.visualViewport.removeEventListener('scroll', scrollCursorIntoVisualView);
+    }
     window.removeEventListener('solomd:relayout', onRelayout);
     window.removeEventListener('solomd:flush-content-sync', flushContentSync);
   };
@@ -5096,9 +5135,9 @@ watch(
 );
 
 watch(
-  [() => settings.fontSize, () => settings.fontFamily],
-  ([n, f]) => {
-    view?.dispatch({ effects: fontSizeCompartment.reconfigure(fontSizeTheme(n, f)) });
+  [() => settings.fontSize, () => settings.fontFamily, () => settings.lineHeight],
+  ([n, f, lh]) => {
+    view?.dispatch({ effects: fontSizeCompartment.reconfigure(fontSizeTheme(n, f, lh)) });
   }
 );
 
@@ -5783,6 +5822,10 @@ const cls = computed(() => ({
 :deep(.cm-editor) {
   height: 100%;
   outline: none;
+}
+:deep(.cm-editor .cm-scroller) {
+  padding-bottom: calc(var(--kb-covered-bottom, 0px) + 80px) !important;
+  box-sizing: border-box;
 }
 :deep(.cm-editor.cm-focused) {
   outline: none;

@@ -59,7 +59,8 @@ export function useI18n() {
 
 /** BCP 47 tag for `<html lang>`; Chinese uses Simplified region. */
 export function htmlLangFor(lang: string): string {
-  return lang === 'zh' ? 'zh-CN' : 'en';
+  const resolved = lang === 'auto' ? detectSystemLanguage() : lang;
+  return resolved === 'zh' ? 'zh-CN' : 'en';
 }
 
 /**

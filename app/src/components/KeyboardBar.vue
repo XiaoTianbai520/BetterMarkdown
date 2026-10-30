@@ -12,7 +12,7 @@
  *
  * Every button goes through an existing path: `fmt.*` via
  * `solomd:format-markdown` (the same handler as the shortcut), the insert-image
- * command via `solomd:menu-action`, undo via `solomd:editor-history`. The
+ * command via `solomd:menu-action`, undo/redo via `solomd:editor-history`. The
  * buttons never take focus (`mousedown.prevent`), so the keyboard stays up.
  *
  * `?forceKeyboardBar` (dev only) previews it in a desktop browser, pinned to
@@ -139,8 +139,7 @@ onBeforeUnmount(() => {
 
 const visible = computed(
   () =>
-    editorFocused.value &&
-    keyboardOpen.value &&
+    (preview || (editorFocused.value && keyboardOpen.value)) &&
     settings.viewMode !== 'preview' &&
     settings.viewMode !== 'reading',
 );
@@ -154,6 +153,9 @@ function insertImage() {
 function undo() {
   window.dispatchEvent(new CustomEvent('solomd:editor-history', { detail: { op: 'undo' } }));
 }
+function redo() {
+  window.dispatchEvent(new CustomEvent('solomd:editor-history', { detail: { op: 'redo' } }));
+}
 function hideKeyboard() {
   const a = document.activeElement;
   if (a instanceof HTMLElement) a.blur();
@@ -161,13 +163,16 @@ function hideKeyboard() {
 }
 
 const buttons = computed(() => [
-  { id: 'heading', icon: 'heading', label: t('formatBar.heading'), run: () => format('headingCycle') },
   { id: 'bold', icon: 'bold', label: t('cmd.fmt.bold'), run: () => format('bold') },
+  { id: 'italic', icon: 'italic', label: t('cmd.fmt.italic'), run: () => format('italic') },
+  { id: 'heading', icon: 'heading', label: t('formatBar.heading'), run: () => format('headingCycle') },
   { id: 'ul', icon: 'list', label: t('cmd.fmt.ul'), run: () => format('ul') },
   { id: 'task', icon: 'task', label: t('cmd.fmt.task'), run: () => format('task') },
+  { id: 'codeblock', icon: 'code', label: t('cmd.fmt.codeblock'), run: () => format('codeblock') },
   { id: 'link', icon: 'link', label: t('cmd.fmt.link'), run: () => format('link') },
   { id: 'image', icon: 'image', label: t('formatBar.image'), run: insertImage },
   { id: 'undo', icon: 'undo', label: t('formatBar.undo'), run: undo },
+  { id: 'redo', icon: 'redo', label: t('formatBar.redo') || 'Redo', run: redo },
   { id: 'hide', icon: 'keyboard-hide', label: t('formatBar.hideKeyboard'), run: hideKeyboard },
 ]);
 </script>
@@ -203,41 +208,48 @@ const buttons = computed(() => [
   top: 0;
   left: 0;
   right: 0;
-  z-index: var(--z-sticky);
+  z-index: var(--z-sticky, 100);
   height: 44px;
   display: flex;
   align-items: stretch;
-  padding: 0 max(var(--sp-1), env(safe-area-inset-right)) 0 max(var(--sp-1), env(safe-area-inset-left));
-  background: var(--bg-sidebar);
-  border-top: var(--bd-hair);
+  padding: 0 max(var(--sp-1, 4px), env(safe-area-inset-right)) 0 max(var(--sp-1, 4px), env(safe-area-inset-left));
+  background: var(--bg-sidebar, #f7f7f7);
+  border-top: var(--bd-hair, 1px solid rgba(0, 0, 0, 0.1));
   user-select: none;
   -webkit-user-select: none;
   -webkit-tap-highlight-color: transparent;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+.kb-bar::-webkit-scrollbar {
+  display: none;
 }
 .kb-bar__btn {
-  flex: 1;
+  flex: 0 0 auto;
   min-width: 44px;
   height: 44px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 0;
+  padding: 0 8px;
   border: 0;
-  border-radius: var(--r-md);
+  border-radius: var(--r-md, 6px);
   background: transparent;
-  color: var(--text);
-  cursor: default;
+  color: var(--text, #111);
+  cursor: pointer;
   touch-action: manipulation;
 }
 .kb-bar__btn:active {
-  background: var(--fill-2);
+  background: var(--fill-2, rgba(0, 0, 0, 0.08));
 }
 .kb-bar__btn--end {
-  color: var(--text-2);
+  margin-left: auto;
+  color: var(--text-2, #666);
 }
 @media (hover: hover) {
   .kb-bar__btn:hover {
-    background: var(--fill-1);
+    background: var(--fill-1, rgba(0, 0, 0, 0.04));
   }
 }
 </style>
