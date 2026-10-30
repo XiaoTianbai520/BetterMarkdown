@@ -97,14 +97,14 @@ async function visit(url: string) {
     <!-- Empty header slot keeps DsModal's × close button without a title bar,
          since the About content is centered branding rather than a labelled
          form. -->
-    <template #header><span class="about__hdr" aria-label="About SoloMD"></span></template>
+    <template #header><span class="about__hdr" aria-label="About ZeroMD"></span></template>
 
     <div class="about">
       <div class="about__brand">
-        <BrandMark class="brand" :size="64" label="SoloMD" />
+        <BrandMark class="brand" :size="64" label="ZeroMD" />
       </div>
 
-      <h2 class="about__name">SoloMD</h2>
+      <h2 class="about__name">ZeroMD</h2>
       <div class="about__version-row">
         <span class="about__version">v{{ VERSION }}</span>
         <button

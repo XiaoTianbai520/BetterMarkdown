@@ -1,6 +1,7 @@
-# SoloMD (Android Edition)
+# ZeroMD (Android Edition)
 
 > 轻量、纯净、本地优先的专属 Android 轻量化 Markdown 编辑器。
+> Zero Bloatware, Zero Tracking, Zero Lock-in. Just Write.
 
 > [!NOTE]
 > **专属 Android 轻量化改造**
@@ -18,7 +19,7 @@
 ## 核心特性 (Features)
 
 - **纯本地优先 (Local-First)**：所有笔记完整保存在 Android 设备的存储目录中，支持系统 SAF（`ACTION_OPEN_DOCUMENT_TREE`）与文件关联查看。
-- **文件关联直开**：在 Android 系统文件管理器中支持“用 SoloMD 打开”查看与编辑 `.md`、`.markdown`、`.mdown`、`.mkd` 及 `.txt` 文档。
+- **文件关联直开**：在 Android 系统文件管理器中支持“用 ZeroMD 打开”查看与编辑 `.md`、`.markdown`、`.mdown`、`.mkd` 及 `.txt` 文档。
 - **轻量与高性能 (Lightweight & Fast)**：针对移动端手势与屏幕自适应深度调优，瞬时启动，极低内存占用。
 - **现代 Markdown 写作**：CodeMirror 6 驱动，支持实时渲染、LaTeX 数学公式、代码高亮、GFM 任务清单与表格。
 - **原生深浅色支持**：遵循 Material Design 规范，自适应系统深浅色切换及屏幕旋转与边缘防遮挡。

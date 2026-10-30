@@ -63,7 +63,7 @@ export const zh: I18n = {
     helpCli: '命令行 (CLI)',
     zoom: '缩放',
     find: "查找…",
-    about: '关于 SoloMD',
+    about: '关于 ZeroMD',
     aboutShort: '关于',
     minimize: '最小化',
     maximize: '最大化',
@@ -749,7 +749,7 @@ export const zh: I18n = {
     desc: '一款轻量、跨平台的 Markdown 与纯文本编辑器。',
   },
   help: {
-    about: '关于 SoloMD',
+    about: '关于 ZeroMD',
     markdownGuide: 'Markdown 指南',
     keyboardShortcuts: '快捷键',
     noMatchingSyntax: "没有匹配的语法",

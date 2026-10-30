@@ -62,7 +62,7 @@ export const en = {
     helpCli: 'Command Line (CLI)',
     zoom: 'Zoom',
     find: "Find…",
-    about: 'About SoloMD',
+    about: 'About ZeroMD',
     aboutShort: 'About',
     minimize: 'Minimize',
     maximize: 'Maximize',
@@ -754,7 +754,7 @@ export const en = {
     desc: 'A lightweight, cross-platform Markdown + plain text editor.',
   },
   help: {
-    about: 'About SoloMD',
+    about: 'About ZeroMD',
     markdownGuide: 'Markdown Guide',
     keyboardShortcuts: 'Keyboard Shortcuts',
     noMatchingSyntax: "No matching syntax",

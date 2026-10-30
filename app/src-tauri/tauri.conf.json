@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "SoloMD",
-  "version": "5.0.9",
-  "identifier": "app.solomd",
+  "productName": "ZeroMD",
+  "version": "1.0.0",
+  "identifier": "app.zeromd",
   "build": {
     "beforeDevCommand": "pnpm dev",
     "devUrl": "http://localhost:1420",
@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "SoloMD",
+        "title": "ZeroMD",
         "width": 1200,
         "height": 800,
         "minWidth": 480,
@@ -30,16 +30,16 @@
       }
     }
   },
-  "mainBinaryName": "SoloMD",
+  "mainBinaryName": "ZeroMD",
   "bundle": {
     "active": true,
     "targets": "all",
     "category": "Productivity",
     "license": "MIT",
-    "publisher": "zhitong",
-    "homepage": "https://solomd.app",
-    "shortDescription": "Lightweight Markdown + plain text editor",
-    "longDescription": "SoloMD is a lightweight, distraction-free editor for Markdown and plain text files. One file. One window. Just write.",
+    "publisher": "ZeroMD",
+    "homepage": "https://github.com",
+    "shortDescription": "ZeroMD — Lightweight Android Markdown Editor",
+    "longDescription": "ZeroMD is a lightweight, distraction-free Android Markdown editor. Zero bloatware, zero tracking. Just write.",
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",

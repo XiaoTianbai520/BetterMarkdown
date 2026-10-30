@@ -1,13 +1,13 @@
 [package]
-name = "solomd"
-version = "5.0.9"
-description = "SoloMD — a lightweight, cross-platform Markdown + plain text editor"
-authors = ["zhitong"]
+name = "zeromd"
+version = "1.0.0"
+description = "ZeroMD — a lightweight, distraction-free Android Markdown editor"
+authors = ["ZeroMD"]
 edition = "2021"
 autobins = false
 
 [[bin]]
-name = "SoloMD"
+name = "ZeroMD"
 path = "src/main.rs"
 
 [profile.release]
