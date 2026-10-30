@@ -1,4 +1,4 @@
-//! #148 (Magic OS follow-up) — Storage Access Framework (SAF) folder access.
+﻿//! #148 (Magic OS follow-up) — Storage Access Framework (SAF) folder access.
 //!
 //! On some OEM ROMs (Honor/Huawei Magic OS) MANAGE_EXTERNAL_STORAGE grants
 //! nothing: `isExternalStorageManager()` is true but `std::fs` on
@@ -415,9 +415,32 @@ mod imp {
         })
     }
 
+    fn base64_encode(data: &[u8]) -> String {
+        const B64_CHARS: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+        let mut result = String::with_capacity((data.len() + 2) / 3 * 4);
+        for chunk in data.chunks(3) {
+            let b0 = chunk[0] as usize;
+            let b1 = chunk.get(1).copied().unwrap_or(0) as usize;
+            let b2 = chunk.get(2).copied().unwrap_or(0) as usize;
+            let triple = (b0 << 16) | (b1 << 8) | b2;
+            result.push(B64_CHARS[(triple >> 18) & 0x3F] as char);
+            result.push(B64_CHARS[(triple >> 12) & 0x3F] as char);
+            if chunk.len() > 1 {
+                result.push(B64_CHARS[(triple >> 6) & 0x3F] as char);
+            } else {
+                result.push('=');
+            }
+            if chunk.len() > 2 {
+                result.push(B64_CHARS[triple & 0x3F] as char);
+            } else {
+                result.push('=');
+            }
+        }
+        result
+    }
+
     pub fn write_content_uri_bytes(uri: &str, data: &[u8]) -> Result<(), String> {
-        use base64::{engine::general_purpose::STANDARD, Engine as _};
-        let b64 = STANDARD.encode(data);
+        let b64 = base64_encode(data);
         with_env(|env| {
             let a = jstr(env, uri)?;
             let b = jstr(env, &b64)?;

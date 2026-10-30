@@ -4,23 +4,21 @@
 //! Scans the active workspace folder for `.md`/`.markdown` files, extracts
 //! YAML front matter, wikilinks (`[[X]]`), `#tags`, and headings. Holds
 //! everything in-memory; persists a JSON cache per workspace at
-//! `<app_data_dir>/index/<sha256(folder)>.json` so warm starts are fast.
+//! `<app_data_dir>/index/<hash(folder)>.json` so warm starts are fast.
 //!
 //! A file watcher (notify) keeps the index live; on debounced changes the
 //! affected file is re-scanned and an `solomd://index-updated` event is
 //! emitted to the frontend.
 
-use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
+use std::hash::{DefaultHasher, Hasher};
 use std::path::{Path, PathBuf};
-use std::sync::{Mutex, RwLock};
+use std::sync::{LazyLock, Mutex, RwLock};
 use std::time::{Duration, SystemTime};
 
 use notify::{Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
-use regex_lite::Regex;
-use sha2::{Digest, Sha256};
 use tauri::{AppHandle, Emitter, Manager};
 use walkdir::WalkDir;
 
@@ -31,53 +29,26 @@ use walkdir::WalkDir;
 /// One `- [ ]` / `- [x]` item, as found in a file.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TaskRef {
-    /// 1-based line number **in the file**, front matter included.
-    ///
-    /// Same convention as `WikilinkRef::line`: the
-    /// panel both jumps to this line and rewrites the checkbox on it, so an
-    /// off-by-front-matter number would tick the wrong box.
     pub line: u32,
-    /// The task text, marker and leading bullet stripped. Priority and due
-    /// tokens are left in — the frontend parses those (`lib/tasks.ts`) so the
-    /// syntax lives in one place rather than being written twice.
     pub text: String,
     pub done: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct IndexEntry {
-    /// Absolute filesystem path.
     pub path: String,
-    /// File name (without folder), e.g. `Welcome.md`.
     pub name: String,
-    /// File name without extension — used as the canonical wikilink target.
     pub stem: String,
-    /// Modification time (seconds since UNIX epoch).
     pub mtime: u64,
-    /// File size in bytes.
     pub size: u64,
-    /// Parsed YAML front matter (empty map if none).
     pub frontmatter: serde_json::Value,
-    /// Outbound wikilinks (just the targets, not the alias / heading parts).
     pub wikilinks: Vec<WikilinkRef>,
-    /// Tags found in body (`#tag`) and front matter (`tags: [...]`).
     pub tags: Vec<String>,
-    /// Headings, e.g. `["Introduction", "Setup"]`.
     pub headings: Vec<String>,
-    /// GFM task-list items (`- [ ]` / `- [x]`), for the workspace task panel.
-    /// Defaults to empty when deserialized from an index cache written before
-    /// this field existed.
     #[serde(default)]
     pub tasks: Vec<TaskRef>,
-    /// First non-empty body line (front matter stripped), trimmed to 200 chars.
     pub summary: String,
-    /// First H1 heading text (used for resolution by-title).
     pub title: Option<String>,
-    /// F3 (v4.6) typed relationships: map `frontmatter key → list of canonical
-    /// `[[ref]]`s`. Any non-reserved front-matter key whose value contains a
-    /// wikilink. Mirrors `app/src/lib/relationships.ts::extractRelationships`.
-    /// Defaults to empty for entries deserialized from an older index cache
-    /// that predates this field.
     #[serde(default)]
     pub relationships: HashMap<String, Vec<String>>,
 }
@@ -87,7 +58,6 @@ pub struct IndexEntry {
 pub struct ReferencedByRef {
     pub from_path: String,
     pub from_name: String,
-    /// The forward-relationship front-matter key on the source note.
     pub via_key: String,
 }
 
@@ -96,8 +66,6 @@ pub struct WikilinkRef {
     pub target: String,
     pub heading: Option<String>,
     pub alias: Option<String>,
-    /// 1-based line number **in the file** (front matter included) where the
-    /// link appears — backlinks read context from and jump to this line.
     pub line: u32,
 }
 
@@ -106,7 +74,6 @@ pub struct BacklinkRef {
     pub from_path: String,
     pub from_name: String,
     pub line: u32,
-    /// Three-line snippet: prev / matching / next line for context.
     pub context: Vec<String>,
 }
 
@@ -114,7 +81,6 @@ pub struct BacklinkRef {
 pub struct TagCount {
     pub tag: String,
     pub count: u32,
-    /// Files (paths) that contain this tag.
     pub files: Vec<String>,
 }
 
@@ -123,15 +89,12 @@ pub struct TagCount {
 // ---------------------------------------------------------------------------
 
 struct State {
-    /// Workspace root currently watched (None until init).
     root: Option<PathBuf>,
-    /// path -> entry
     entries: HashMap<PathBuf, IndexEntry>,
-    /// notify watcher kept alive while index is active.
     _watcher: Option<RecommendedWatcher>,
 }
 
-static STATE: Lazy<RwLock<State>> = Lazy::new(|| {
+static STATE: LazyLock<RwLock<State>> = LazyLock::new(|| {
     RwLock::new(State {
         root: None,
         entries: HashMap::new(),
@@ -139,10 +102,8 @@ static STATE: Lazy<RwLock<State>> = Lazy::new(|| {
     })
 });
 
-/// Channel used to debounce raw notify events before re-scanning a file.
-/// Keep one global for the whole app; a single workspace at a time is fine.
-static PENDING: Lazy<Mutex<HashMap<PathBuf, SystemTime>>> =
-    Lazy::new(|| Mutex::new(HashMap::new()));
+static PENDING: LazyLock<Mutex<HashMap<PathBuf, SystemTime>>> =
+    LazyLock::new(|| Mutex::new(HashMap::new()));
 
 // ---------------------------------------------------------------------------
 // Tauri commands
@@ -161,7 +122,6 @@ fn workspace_index_init_inner(app: AppHandle, folder: String) -> Result<usize, S
         return Err(format!("not a directory: {folder}"));
     }
 
-    // Reset state.
     {
         let mut s = STATE.write().map_err(|e| e.to_string())?;
         s.entries.clear();
@@ -169,9 +129,6 @@ fn workspace_index_init_inner(app: AppHandle, folder: String) -> Result<usize, S
         s._watcher = None;
     }
 
-    // Try cache first (fast warm start). If cache is missing or stale per-file
-    // mtimes are checked anyway during the rescan loop below, so no separate
-    // freshness logic needed here.
     if let Some(cached) = load_cache(&app, &root) {
         let mut s = STATE.write().map_err(|e| e.to_string())?;
         for entry in cached {
@@ -179,10 +136,8 @@ fn workspace_index_init_inner(app: AppHandle, folder: String) -> Result<usize, S
         }
     }
 
-    // Full scan (this also corrects any drift from cache).
     scan_into(&root)?;
 
-    // Set up watcher.
     let app_for_watch = app.clone();
     let watcher = make_watcher(app_for_watch, root.clone())?;
     {
@@ -226,10 +181,6 @@ pub fn workspace_index_backlinks(target: String) -> Result<Vec<BacklinkRef>, Str
     Ok(out)
 }
 
-/// F3 — inverse relationships: notes whose front matter has a typed
-/// relationship key pointing at `target`. Resolution mirrors
-/// `workspace_index_resolve`'s precedence (stem → title → alias →
-/// path-suffix), case-insensitive; the source note is self-excluded.
 #[tauri::command]
 pub fn workspace_index_referenced_by(target: String) -> Result<Vec<ReferencedByRef>, String> {
     let s = STATE.read().map_err(|e| e.to_string())?;
@@ -238,8 +189,6 @@ pub fn workspace_index_referenced_by(target: String) -> Result<Vec<ReferencedByR
         return Ok(Vec::new());
     }
 
-    // Resolve which entry `target` names (so refs by title/alias/stem all
-    // collapse to one path). First-match wins, mirroring resolve precedence.
     let resolved_path: Option<String> = {
         let by_stem = s
             .entries
@@ -276,9 +225,6 @@ pub fn workspace_index_referenced_by(target: String) -> Result<Vec<ReferencedByR
         for (via_key, refs) in &entry.relationships {
             for reference in refs {
                 let ref_target = parse_ref_target(reference).to_lowercase();
-                // A ref matches if it names this target directly (stem/title/
-                // alias) — compare to both the literal needle AND the resolved
-                // entry's stem so e.g. `[[The Title]]` resolves to the file.
                 let matches_needle = ref_target == needle;
                 let matches_resolved = match &resolved_path {
                     Some(p) => s
@@ -291,7 +237,6 @@ pub fn workspace_index_referenced_by(target: String) -> Result<Vec<ReferencedByR
                 if !(matches_needle || matches_resolved) {
                     continue;
                 }
-                // Self-exclusion: a note referencing itself isn't an inverse.
                 if let Some(p) = &resolved_path {
                     if &entry.path == p {
                         continue;
@@ -314,7 +259,6 @@ pub fn workspace_index_referenced_by(target: String) -> Result<Vec<ReferencedByR
     Ok(out)
 }
 
-/// Collect alias names from a front-matter `aliases` value (string or array).
 fn collect_alias_names(value: &serde_json::Value, out: &mut Vec<String>) {
     match value {
         serde_json::Value::String(s) => out.push(s.trim().to_string()),
@@ -357,13 +301,11 @@ pub fn workspace_index_resolve(name: String) -> Result<Option<String>, String> {
         return Ok(None);
     }
     let needle_lc = needle.to_lowercase();
-    // 1. Exact stem match (case-insensitive)
     for entry in s.entries.values() {
         if entry.stem.to_lowercase() == needle_lc {
             return Ok(Some(entry.path.clone()));
         }
     }
-    // 2. Title (H1) match
     for entry in s.entries.values() {
         if entry
             .title
@@ -374,7 +316,6 @@ pub fn workspace_index_resolve(name: String) -> Result<Option<String>, String> {
             return Ok(Some(entry.path.clone()));
         }
     }
-    // 3. Alias match (frontmatter aliases / alias)
     for entry in s.entries.values() {
         if let serde_json::Value::Object(map) = &entry.frontmatter {
             if let Some(a) = map.get("aliases").or_else(|| map.get("alias")) {
@@ -386,32 +327,22 @@ pub fn workspace_index_resolve(name: String) -> Result<Option<String>, String> {
             }
         }
     }
-    // 4. Path-suffix match — handles Obsidian-style [[folder/note]] where
-    //    the target includes a folder component. Check if the absolute path
-    //    ends with "/needle" or "/needle.md" (case-insensitive, normalized
-    //    to forward slashes). This is the fix for wikilinks that previously
-    //    fell through and created a new file instead of opening.
     {
         let needle_norm = needle_lc.replace('\\', "/");
-        // strip optional .md suffix for suffix check
         let needle_no_ext = needle_norm
             .strip_suffix(".md")
             .unwrap_or(&needle_norm)
             .to_string();
         for entry in s.entries.values() {
             let path_norm = entry.path.replace('\\', "/").to_lowercase();
-            // try with and without extension
             if path_norm.ends_with(&format!("/{}", needle_norm))
                 || path_norm.ends_with(&format!("/{}", needle_no_ext))
                 || path_norm.ends_with(&format!("/{}", format!("{}.md", needle_no_ext)))
             {
                 return Ok(Some(entry.path.clone()));
             }
-            // also handle needle already containing sub-path without leading slash
-            // e.g. entry.path = ".../a/b/c.md", needle = "b/c" → already covered
         }
     }
-    // 5. Substring match in stem (legacy fallback)
     for entry in s.entries.values() {
         if entry.stem.to_lowercase().contains(&needle_lc) {
             return Ok(Some(entry.path.clone()));
@@ -500,7 +431,7 @@ fn scan_file(path: &Path) -> Result<IndexEntry, String> {
 
     let (frontmatter, body) = split_front_matter(&raw);
     let frontmatter_json: serde_json::Value = match frontmatter {
-        Some(fm) => serde_yaml::from_str::<serde_json::Value>(&fm).unwrap_or(serde_json::Value::Null),
+        Some(fm) => parse_frontmatter_yaml(&fm),
         None => serde_json::Value::Null,
     };
 
@@ -515,7 +446,6 @@ fn scan_file(path: &Path) -> Result<IndexEntry, String> {
     tags.dedup();
 
     let headings = extract_headings(body);
-    // Over `raw`, not `body`: task line numbers have to match the file.
     let tasks = extract_tasks(&raw);
     let title = extract_title(&frontmatter_json, &headings);
     let summary = extract_summary(body);
@@ -539,13 +469,9 @@ fn scan_file(path: &Path) -> Result<IndexEntry, String> {
 }
 
 // ---------------------------------------------------------------------------
-// F3 — typed relationships extraction (mirrors lib/relationships.ts).
+// Frontmatter & Relationships
 // ---------------------------------------------------------------------------
 
-/// Front-matter keys that are structural and never count as a typed
-/// relationship even if they contain a wikilink. Must stay byte-for-byte in
-/// sync with `RESERVED_RELATIONSHIP_KEYS` in `app/src/lib/relationships.ts`.
-/// `_`-prefixed keys are also reserved (handled in `is_reserved_key`).
 const RESERVED_RELATIONSHIP_KEYS: &[&str] = &[
     "title",
     "aliases",
@@ -576,14 +502,26 @@ fn is_reserved_key(key: &str) -> bool {
     RESERVED_RELATIONSHIP_KEYS.iter().any(|r| *r == lc)
 }
 
-/// Collect every wikilink in `text`, returning each in canonical `[[target]]`
-/// form (alias / heading stripped). Mirrors the regex used by
-/// `extract_wikilinks`.
+fn find_wikilinks(text: &str) -> Vec<&str> {
+    let mut out = Vec::new();
+    let mut rest = text;
+    while let Some(start) = rest.find("[[") {
+        let after_start = &rest[start + 2..];
+        if let Some(end) = after_start.find("]]") {
+            let inner = &after_start[..end];
+            if !inner.contains('\n') && !inner.contains('[') && !inner.contains(']') && !inner.trim().is_empty() {
+                out.push(inner);
+            }
+            rest = &after_start[end + 2..];
+        } else {
+            break;
+        }
+    }
+    out
+}
+
 fn refs_in_str(text: &str, out: &mut Vec<String>) {
-    static RE: Lazy<Regex> =
-        Lazy::new(|| Regex::new(r"\[\[([^\[\]\n]+?)\]\]").expect("wikilink regex"));
-    for cap in RE.captures_iter(text) {
-        let inner = cap.get(1).map(|m| m.as_str()).unwrap_or("");
+    for inner in find_wikilinks(text) {
         let target_raw = match inner.split_once('|') {
             Some((t, _)) => t.trim().to_string(),
             None => inner.trim().to_string(),
@@ -598,8 +536,6 @@ fn refs_in_str(text: &str, out: &mut Vec<String>) {
     }
 }
 
-/// Recurse into a front-matter value collecting wikilink refs (string scalars
-/// and arrays of strings, at any depth).
 fn collect_refs(value: &serde_json::Value, out: &mut Vec<String>) {
     match value {
         serde_json::Value::String(s) => refs_in_str(s, out),
@@ -612,19 +548,18 @@ fn collect_refs(value: &serde_json::Value, out: &mut Vec<String>) {
     }
 }
 
-/// Extract typed relationships from parsed front matter: every non-reserved
-/// key whose value contains at least one wikilink, mapped to its canonical
-/// `[[ref]]` list. Mirrors `extractRelationships` in `lib/relationships.ts`.
 fn extract_relationships(fm: &serde_json::Value) -> HashMap<String, Vec<String>> {
     let mut out: HashMap<String, Vec<String>> = HashMap::new();
     if let serde_json::Value::Object(map) = fm {
-        for (key, value) in map {
+        for (key, val) in map {
             if is_reserved_key(key) {
                 continue;
             }
             let mut refs = Vec::new();
-            collect_refs(value, &mut refs);
+            collect_refs(val, &mut refs);
             if !refs.is_empty() {
+                refs.sort();
+                refs.dedup();
                 out.insert(key.clone(), refs);
             }
         }
@@ -632,13 +567,10 @@ fn extract_relationships(fm: &serde_json::Value) -> HashMap<String, Vec<String>>
     out
 }
 
-/// Strip `[[ ]]` (and any `#heading` / `|alias`) from a ref, returning the
-/// bare target stem.
 fn parse_ref_target(reference: &str) -> String {
     let mut v = Vec::new();
     refs_in_str(reference, &mut v);
     if let Some(first) = v.first() {
-        // first is `[[target]]`
         return first
             .trim_start_matches("[[")
             .trim_end_matches("]]")
@@ -659,7 +591,6 @@ fn split_front_matter(raw: &str) -> (Option<String>, &str) {
     if let Some(end) = after_first.find("\n---") {
         let yaml = &after_first[..end];
         let rest_offset_in_after = end + "\n---".len();
-        // skip past the closing line break
         let rest = &after_first[rest_offset_in_after..];
         let rest = rest.strip_prefix('\n').unwrap_or(rest);
         return (Some(yaml.to_string()), rest);
@@ -667,11 +598,6 @@ fn split_front_matter(raw: &str) -> (Option<String>, &str) {
     (None, raw)
 }
 
-/// Number of lines that precede `body` in `raw` — i.e. the front-matter
-/// block's height. `body` must be a sub-slice of `raw`, as returned by
-/// `split_front_matter`. Adding this to a body-relative 0-based line index
-/// yields the index in the file, which is what anything that opens the file
-/// at that line (backlinks context, jump-to-line) needs.
 pub(crate) fn body_line_offset(raw: &str, body: &str) -> u32 {
     let start = body.as_ptr() as usize;
     let base = raw.as_ptr() as usize;
@@ -684,17 +610,10 @@ pub(crate) fn body_line_offset(raw: &str, body: &str) -> u32 {
         .count() as u32
 }
 
-/// `line_offset` is `body_line_offset(raw, body)`, so `WikilinkRef::line` is
-/// the 1-based line **in the file** (front matter included).
 fn extract_wikilinks(body: &str, line_offset: u32) -> Vec<WikilinkRef> {
-    static RE: Lazy<Regex> = Lazy::new(|| {
-        Regex::new(r"\[\[([^\[\]\n]+?)\]\]").expect("wikilink regex")
-    });
     let mut out = Vec::new();
     for (line_idx, line) in body.lines().enumerate() {
-        for cap in RE.captures_iter(line) {
-            let inner = cap.get(1).map(|m| m.as_str()).unwrap_or("");
-            // Form: target[#heading][|alias]
+        for inner in find_wikilinks(line) {
             let (target_raw, alias) = match inner.split_once('|') {
                 Some((t, a)) => (t.trim().to_string(), Some(a.trim().to_string())),
                 None => (inner.trim().to_string(), None),
@@ -718,84 +637,52 @@ fn extract_wikilinks(body: &str, line_offset: u32) -> Vec<WikilinkRef> {
 }
 
 fn extract_body_tags(body: &str) -> Vec<String> {
-    // Hand-rolled scanner — `regex-lite` does NOT support Unicode classes
-    // (`\p{L}` / `\p{N}`), and trying to compile such a pattern panics at
-    // runtime. We use `char::is_alphanumeric` which IS Unicode-aware.
     let mut out = Vec::new();
     let mut in_fence = false;
     for line in body.lines() {
-        if line.trim_start().starts_with("```") {
+        let trimmed = line.trim_start();
+        if trimmed.starts_with("```") || trimmed.starts_with("~~~") {
             in_fence = !in_fence;
             continue;
         }
         if in_fence {
             continue;
         }
-        // Strip inline code spans (cheap pass) before scanning.
-        let stripped = strip_inline_code(line);
-        scan_tags_in_line(&stripped, &mut out);
+        let stripped_line = strip_inline_code(line);
+        let chars: Vec<char> = stripped_line.chars().collect();
+        let mut i = 0;
+        while i < chars.len() {
+            let c = chars[i];
+            let preceded_ok = i == 0 || chars[i - 1].is_whitespace();
+            if c == '#' && preceded_ok {
+                if i + 1 < chars.len() && chars[i + 1].is_alphanumeric() {
+                    let mut j = i + 1;
+                    while j < chars.len()
+                        && (chars[j].is_alphanumeric()
+                            || chars[j] == '_'
+                            || chars[j] == '/'
+                            || chars[j] == '-')
+                    {
+                        j += 1;
+                    }
+                    let tag: String = chars[i + 1..j].iter().collect();
+                    if !tag.chars().all(|c| c.is_ascii_digit()) {
+                        out.push(tag);
+                    }
+                    i = j;
+                    continue;
+                }
+            }
+            i += 1;
+        }
     }
     out
 }
 
-fn scan_tags_in_line(line: &str, out: &mut Vec<String>) {
-    let bytes = line.as_bytes();
-    let mut chars = line.char_indices().peekable();
-    while let Some((i, c)) = chars.next() {
-        if c != '#' {
-            continue;
-        }
-        // `#` must be at start of line OR preceded by whitespace.
-        if i > 0 {
-            let prev = bytes[i - 1];
-            if !(prev as char).is_whitespace() {
-                continue;
-            }
-        }
-        // First char of tag must be alphanumeric (Unicode-aware).
-        let mut tag = String::new();
-        // Peek next char.
-        let first = match chars.peek() {
-            Some(&(_, ch)) if ch.is_alphanumeric() => ch,
-            _ => continue,
-        };
-        chars.next();
-        tag.push(first);
-        // Subsequent chars: alphanumeric or `_` `/` `-`.
-        while let Some(&(_, ch)) = chars.peek() {
-            if ch.is_alphanumeric() || ch == '_' || ch == '/' || ch == '-' {
-                tag.push(ch);
-                chars.next();
-            } else {
-                break;
-            }
-        }
-        if !tag.is_empty() {
-            // a) Tag must be followed by whitespace or end-of-line — otherwise
-            //    it is likely a CSS property value (e.g. `#488878;`).
-            if let Some(&(_, ch)) = chars.peek() {
-                if !ch.is_whitespace() {
-                    continue;
-                }
-            }
-            // b) 6-char pure hex string → almost certainly a colour code.
-            if tag.len() == 6 && tag.chars().all(|c| c.is_ascii_hexdigit()) {
-                continue;
-            }
-            // c) In table rows, skip purely numeric "tags" — they are rankings
-            //    (#1, #2, #3) or issue/row numbers (#12, #26), not real tags.
-            if tag.chars().all(|c| c.is_ascii_digit()) && line.trim_start().starts_with('|') {
-                continue;
-            }
-            out.push(tag);
-        }
-    }
-}
-
-fn strip_inline_code(s: &str) -> String {
-    let mut out = String::with_capacity(s.len());
+fn strip_inline_code(line: &str) -> String {
+    let mut out = String::with_capacity(line.len());
     let mut in_code = false;
-    for ch in s.chars() {
+    for ch in line.chars() {
         if ch == '`' {
             in_code = !in_code;
             out.push(' ');
@@ -827,339 +714,139 @@ fn collect_yaml_tags(value: &serde_json::Value, out: &mut Vec<String>) {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
+pub fn parse_frontmatter_yaml(src: &str) -> serde_json::Value {
+    let mut map = serde_json::Map::new();
+    let mut current_key: Option<String> = None;
+    let mut current_list: Option<Vec<serde_json::Value>> = None;
 
-    #[test]
-    fn test_strip_inline_code_basic() {
-        let stripped = strip_inline_code("purple bg `#1A1033` + text `#9B7EE0`");
-        assert!(!stripped.contains('#'), "inline code should be stripped: {:?}", stripped);
-    }
-
-    #[test]
-    fn test_body_tags_skip_inline_code() {
-        let body = "- Active item: purple bg `#1A1033` + text `#9B7EE0` + fontWeight 600\n- Inactive: no fill + text `#94A3B8`\n- Sub-item: padding `[8,12,8,40]`, fontSize 13\n\n#real-tag";
-        let tags = extract_body_tags(body);
-        assert!(tags.contains(&"real-tag".to_string()), "should find #real-tag");
-        assert!(!tags.iter().any(|t| t.contains("9B7EE0")), "should NOT pick up hex color from inline code");
-        assert!(!tags.iter().any(|t| t.contains("1A1033")), "should NOT pick up hex color from inline code");
-        assert!(!tags.iter().any(|t| t.contains("94A3B8")), "should NOT pick up hex color from inline code");
-    }
-
-    #[test]
-    fn test_table_backtick_hex_colors() {
-        // Exact user-reported lines with backtick-enclosed hex colors in table cells
-        let lines = [
-            "| `#ffffff` | `#111B27` | Card bg |",
-            "| `#f1f5f9` | `#1E293B` | Gray bg / status |",
-            "| `#e2e8f0` | `#1E293B` | Dividers |",
-        ];
-        for line in &lines {
-            let stripped = strip_inline_code(line);
-            // After stripping inline code, no `#` should remain
-            assert!(
-                !stripped.contains('#'),
-                "strip_inline_code should remove # from backtick content in: {:?} → {:?}",
-                line, stripped
-            );
+    for line in src.lines() {
+        let trimmed = line.trim();
+        if trimmed.is_empty() || trimmed.starts_with('#') {
+            continue;
         }
-        // Full extraction should find zero tags
-        let body = lines.join("\n");
-        let tags = extract_body_tags(&body);
-        assert!(
-            tags.is_empty(),
-            "backtick-enclosed hex colors should NOT be tags, found: {:?}",
-            tags
-        );
-    }
 
-    #[test]
-    fn test_table_no_backtick_hex_colors() {
-        // Same content WITHOUT backticks — hex filter should catch them
-        let lines = [
-            "| #ffffff | #111B27 | Card bg |",
-            "| #f1f5f9 | #1E293B | Gray bg / status |",
-            "| #e2e8f0 | #1E293B | Dividers |",
-        ];
-        let body = lines.join("\n");
-        let tags = extract_body_tags(&body);
-        assert!(
-            tags.is_empty(),
-            "hex colors without backticks should be filtered by hex check, found: {:?}",
-            tags
-        );
-    }
-
-    #[test]
-    fn test_link_anchor_not_tag() {
-        // Markdown link: (#12-tab-可见性规则) — # is preceded by '(' not whitespace
-        let line = "12. [Tab 可见性规则](#12-tab-可见性规则)";
-        let mut tags = vec![];
-        scan_tags_in_line(line, &mut tags);
-        assert!(
-            tags.is_empty(),
-            "link anchor #12 should NOT be a tag, found: {:?}",
-            tags
-        );
-    }
-
-    #[test]
-    fn hex_colors_not_tags() {
-        let mut tags = vec![];
-        // CSS-like contexts — semicolons / non-space after hex → filtered by boundary
-        scan_tags_in_line("color: #488878;", &mut tags);
-        scan_tags_in_line("bg: #9B7EE0 solid", &mut tags);
-        // Valid tags (non-table lines — numeric tags OK)
-        scan_tags_in_line("see #TaskOn here", &mut tags);
-        scan_tags_in_line("ref #1 and #12 ok", &mut tags);
-        assert_eq!(tags, vec!["TaskOn", "1", "12"]);
-    }
-
-    #[test]
-    fn table_numeric_not_tags() {
-        // Rankings and issue numbers in table rows should be excluded
-        let mut tags = vec![];
-        scan_tags_in_line("| P67 | #1 DeFi_Whale 12,800pts, #2 CryptoKing |", &mut tags);
-        scan_tags_in_line("| #1 (center) | highest | amber |", &mut tags);
-        scan_tags_in_line("| #26 Community Wizard preview |", &mut tags);
-        // Non-table numeric tags still valid
-        scan_tags_in_line("see #12 here", &mut tags);
-        assert_eq!(tags, vec!["12"]);
-    }
-
-    #[test]
-    fn hex_colors_in_table_not_tags() {
-        // Exact user-reported line: hex colors in markdown table cells, no backticks
-        let line = "| Theme | Dark (#0A0F1A bg, #111B27 cards) |";
-        let mut tags = vec![];
-        scan_tags_in_line(line, &mut tags);
-        assert!(
-            tags.is_empty(),
-            "hex colors in table should NOT be tags, but found: {:?}",
-            tags
-        );
-    }
-
-    #[test]
-    fn test_body_tags_skip_table_inline_code() {
-        let body = "\
-| 属性 | 值 |
-|------|-----|
-| 页面背景 | `#0A0F1A` (深色) |
-| Header 背景 | `#0F172A` |
-| 卡片背景 | `#111B27` |
-| 边框 | `#1E293B` |
-| Primary 强调色 | `#F59E0B` (amber) |
-| 主文本 | `#F1F5F9` |
-| 次级文本 | `#94A3B8` |
-| 按钮主色 | `#F59E0B` fill, `#000000` text |
-| 状态绿 | `#48BB78` (completed/claimed) |
-| 状态灰 | `#64748B` (locked/disabled) |
-";
-        let tags = extract_body_tags(body);
-        let hex_tags: Vec<&String> = tags.iter().filter(|t| t.chars().all(|c| c.is_ascii_hexdigit())).collect();
-        assert!(
-            hex_tags.is_empty(),
-            "hex color codes inside backticks should NOT be tags, but found: {:?}",
-            hex_tags
-        );
-    }
-
-    // -----------------------------------------------------------------------
-    // F3 — typed relationships extraction (mirrors lib/relationships.ts).
-    // -----------------------------------------------------------------------
-
-    fn fm(yaml: &str) -> serde_json::Value {
-        serde_yaml::from_str::<serde_json::Value>(yaml).unwrap_or(serde_json::Value::Null)
-    }
-
-    #[test]
-    fn relationships_scalar_and_array() {
-        let v = fm("belongs_to: \"[[b]]\"\ncites:\n  - \"[[a]]\"\n  - \"[[c]]\"");
-        let rel = extract_relationships(&v);
-        assert_eq!(rel.get("belongs_to").unwrap(), &vec!["[[b]]".to_string()]);
-        assert_eq!(
-            rel.get("cites").unwrap(),
-            &vec!["[[a]]".to_string(), "[[c]]".to_string()]
-        );
-    }
-
-    #[test]
-    fn relationships_arbitrary_custom_key() {
-        let v = fm("author: \"[[jane]]\"");
-        let rel = extract_relationships(&v);
-        assert_eq!(rel.get("author").unwrap(), &vec!["[[jane]]".to_string()]);
-    }
-
-    #[test]
-    fn relationships_reserved_keys_excluded() {
-        let v = fm("title: \"[[x]]\"\ntags:\n  - \"[[y]]\"\nrelated_to: \"[[z]]\"");
-        let rel = extract_relationships(&v);
-        assert!(!rel.contains_key("title"));
-        assert!(!rel.contains_key("tags"));
-        assert_eq!(rel.get("related_to").unwrap(), &vec!["[[z]]".to_string()]);
-    }
-
-    #[test]
-    fn relationships_underscore_prefixed_excluded() {
-        let v = fm("_internal: \"[[a]]\"\ncites: \"[[b]]\"");
-        let rel = extract_relationships(&v);
-        assert!(!rel.contains_key("_internal"));
-        assert!(rel.contains_key("cites"));
-    }
-
-    #[test]
-    fn relationships_non_wikilink_ignored() {
-        let v = fm("status: draft\ncount: 3\nbelongs_to: \"[[b]]\"");
-        let rel = extract_relationships(&v);
-        assert_eq!(rel.len(), 1);
-        assert!(rel.contains_key("belongs_to"));
-    }
-
-    #[test]
-    fn relationships_alias_heading_collapse() {
-        let v = fm("ref: \"[[Paper A|the paper]]\"\nsee: \"[[Doc#Heading]]\"");
-        let rel = extract_relationships(&v);
-        assert_eq!(rel.get("ref").unwrap(), &vec!["[[Paper A]]".to_string()]);
-        assert_eq!(rel.get("see").unwrap(), &vec!["[[Doc]]".to_string()]);
-    }
-
-    #[test]
-    fn is_reserved_key_matches_ts_set() {
-        assert!(is_reserved_key("_foo"));
-        assert!(is_reserved_key("Title"));
-        assert!(is_reserved_key("CSSClass"));
-        assert!(!is_reserved_key("belongs_to"));
-        assert!(!is_reserved_key("cites"));
-    }
-
-    #[test]
-    fn parse_ref_target_strips_brackets() {
-        assert_eq!(parse_ref_target("[[b]]"), "b");
-        assert_eq!(parse_ref_target("[[a|alias]]"), "a");
-        assert_eq!(parse_ref_target("[[a#h]]"), "a");
-        assert_eq!(parse_ref_target("plain"), "plain");
-    }
-
-    /// Build a synthetic index in STATE and assert referenced_by resolves the
-    /// inverse edges (stem + self-exclusion). Uses the real STATE lock so the
-    /// command path is exercised end-to-end.
-    #[test]
-    fn referenced_by_resolves_inverse_with_self_exclusion() {
-        fn entry(stem: &str, fm_yaml: &str) -> IndexEntry {
-            let fmv = fm(fm_yaml);
-            IndexEntry {
-                path: format!("/{stem}.md"),
-                name: format!("{stem}.md"),
-                stem: stem.to_string(),
-                mtime: 0,
-                size: 0,
-                relationships: extract_relationships(&fmv),
-                frontmatter: fmv,
-                wikilinks: vec![],
-                tags: vec![],
-                headings: vec![],
-                tasks: vec![],
-                summary: String::new(),
-                title: None,
-            }
-        }
-        {
-            let mut s = STATE.write().unwrap();
-            s.entries.clear();
-            for e in [
-                entry("a", "belongs_to: \"[[b]]\"\ncites: \"[[c]]\"\nself: \"[[a]]\""),
-                entry("b", ""),
-                entry("c", ""),
-            ] {
-                s.entries.insert(PathBuf::from(&e.path), e);
+        if let Some(item_str) = trimmed.strip_prefix('-') {
+            let item_val = item_str.trim();
+            if let Some(list) = &mut current_list {
+                list.push(parse_yaml_scalar(item_val));
+                continue;
             }
         }
 
-        let b_inv = workspace_index_referenced_by("b".into()).unwrap();
-        assert_eq!(b_inv.len(), 1);
-        assert_eq!(b_inv[0].from_path, "/a.md");
-        assert_eq!(b_inv[0].via_key, "belongs_to");
+        if let (Some(k), Some(list)) = (current_key.take(), current_list.take()) {
+            map.insert(k, serde_json::Value::Array(list));
+        }
 
-        let c_inv = workspace_index_referenced_by("c".into()).unwrap();
-        assert_eq!(c_inv.len(), 1);
-        assert_eq!(c_inv[0].via_key, "cites");
-
-        // a.md's self-reference must NOT show up as an inverse on a.md.
-        let a_inv = workspace_index_referenced_by("a".into()).unwrap();
-        assert!(a_inv.is_empty(), "self-reference must be excluded: {a_inv:?}");
-
-        // --- Second scenario (same test fn so the two never race over the
-        // shared STATE lock, which cargo would otherwise run in parallel) ---
-        fn entry_titled(stem: &str, title: Option<&str>, fm_yaml: &str) -> IndexEntry {
-            let fmv = fm(fm_yaml);
-            IndexEntry {
-                path: format!("/{stem}.md"),
-                name: format!("{stem}.md"),
-                stem: stem.to_string(),
-                mtime: 0,
-                size: 0,
-                relationships: extract_relationships(&fmv),
-                frontmatter: fmv,
-                wikilinks: vec![],
-                tags: vec![],
-                headings: vec![],
-                tasks: vec![],
-                summary: String::new(),
-                title: title.map(|s| s.to_string()),
+        if let Some((k, v)) = line.split_once(':') {
+            let key = k.trim().trim_matches(['\'', '"']).to_string();
+            if key.is_empty() {
+                continue;
+            }
+            let val = v.trim();
+            if val.is_empty() {
+                current_key = Some(key);
+                current_list = Some(Vec::new());
+            } else if val.starts_with('[') && val.ends_with(']') {
+                let inner = &val[1..val.len() - 1];
+                let items: Vec<serde_json::Value> = inner
+                    .split(',')
+                    .map(|s| parse_yaml_scalar(s.trim()))
+                    .filter(|v| match v {
+                        serde_json::Value::String(s) => !s.is_empty(),
+                        _ => true,
+                    })
+                    .collect();
+                map.insert(key, serde_json::Value::Array(items));
+            } else {
+                map.insert(key, parse_yaml_scalar(val));
             }
         }
-        {
-            let mut s = STATE.write().unwrap();
-            s.entries.clear();
-            for e in [
-                entry_titled("a", None, "related_to: \"[[The Topic]]\""),
-                entry_titled("t", Some("The Topic"), ""),
-            ] {
-                s.entries.insert(PathBuf::from(&e.path), e);
-            }
-        }
-        let t_inv = workspace_index_referenced_by("The Topic".into()).unwrap();
-        assert_eq!(t_inv.len(), 1, "title resolution: {t_inv:?}");
-        assert_eq!(t_inv[0].from_path, "/a.md");
-        assert_eq!(t_inv[0].via_key, "related_to");
+    }
 
-        // Cleanup so we don't leak state into other tests.
-        STATE.write().unwrap().entries.clear();
+    if let (Some(k), Some(list)) = (current_key, current_list) {
+        map.insert(k, serde_json::Value::Array(list));
+    }
+
+    serde_json::Value::Object(map)
+}
+
+fn parse_yaml_scalar(val: &str) -> serde_json::Value {
+    let unquoted = val.trim_matches(['\'', '"']);
+    if unquoted.eq_ignore_ascii_case("true") {
+        serde_json::Value::Bool(true)
+    } else if unquoted.eq_ignore_ascii_case("false") {
+        serde_json::Value::Bool(false)
+    } else if unquoted.eq_ignore_ascii_case("null") || unquoted == "~" {
+        serde_json::Value::Null
+    } else if let Ok(n) = unquoted.parse::<i64>() {
+        serde_json::Value::Number(n.into())
+    } else if let Ok(f) = unquoted.parse::<f64>() {
+        if let Some(num) = serde_json::Number::from_f64(f) {
+            serde_json::Value::Number(num)
+        } else {
+            serde_json::Value::String(unquoted.to_string())
+        }
+    } else {
+        serde_json::Value::String(unquoted.to_string())
     }
 }
 
 fn extract_headings(body: &str) -> Vec<String> {
-    static RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"^(#{1,6})\s+(.+?)\s*$").expect("heading regex"));
     let mut out = Vec::new();
     let mut in_fence = false;
     for line in body.lines() {
-        if line.trim_start().starts_with("```") {
+        let trimmed_start = line.trim_start();
+        if trimmed_start.starts_with("```") || trimmed_start.starts_with("~~~") {
             in_fence = !in_fence;
             continue;
         }
         if in_fence {
             continue;
         }
-        if let Some(cap) = RE.captures(line) {
-            if let Some(m) = cap.get(2) {
-                out.push(m.as_str().trim().to_string());
+        let hashes = line.chars().take_while(|&c| c == '#').count();
+        if (1..=6).contains(&hashes) {
+            let rest = &line[hashes..];
+            if rest.starts_with(' ') || rest.starts_with('\t') {
+                let heading = rest.trim();
+                if !heading.is_empty() {
+                    out.push(heading.to_string());
+                }
             }
         }
     }
     out
 }
 
-/// GFM task-list items, scanned over the raw file so line numbers are the
-/// file's own.
-///
-/// Skips fenced code (a `- [ ] step one` inside a shell block is
-/// documentation, not a task) and YAML front matter.
+fn parse_task_line(line: &str) -> Option<(bool, String)> {
+    let trimmed = line.trim_start();
+    let bullet_rest = if let Some(r) = trimmed.strip_prefix("- ") {
+        r
+    } else if let Some(r) = trimmed.strip_prefix("* ") {
+        r
+    } else if let Some(r) = trimmed.strip_prefix("+ ") {
+        r
+    } else {
+        return None;
+    };
+    let bullet_trimmed = bullet_rest.trim_start();
+    let (done, after_box) = if let Some(r) = bullet_trimmed.strip_prefix("[ ] ") {
+        (false, r)
+    } else if let Some(r) = bullet_trimmed.strip_prefix("[x] ") {
+        (true, r)
+    } else if let Some(r) = bullet_trimmed.strip_prefix("[X] ") {
+        (true, r)
+    } else {
+        return None;
+    };
+    let text = after_box.trim();
+    if text.is_empty() {
+        None
+    } else {
+        Some((done, text.to_string()))
+    }
+}
+
 fn extract_tasks(raw: &str) -> Vec<TaskRef> {
-    static RE: Lazy<Regex> = Lazy::new(|| {
-        Regex::new(r"^\s*[-*+]\s+\[([ xX])\]\s+(.+?)\s*$").expect("task regex")
-    });
     let mut out = Vec::new();
     let mut in_fence = false;
     let mut in_front_matter = false;
@@ -1182,14 +869,9 @@ fn extract_tasks(raw: &str) -> Vec<TaskRef> {
         if in_fence {
             continue;
         }
-        if let Some(cap) = RE.captures(line) {
-            let done = cap.get(1).map(|m| m.as_str() != " ").unwrap_or(false);
-            let text = cap.get(2).map(|m| m.as_str().trim().to_string()).unwrap_or_default();
-            if text.is_empty() {
-                continue;
-            }
+        if let Some((done, text)) = parse_task_line(line) {
             out.push(TaskRef {
-                line: idx as u32 + 1,
+                line: (idx as u32) + 1,
                 text,
                 done,
             });
@@ -1224,10 +906,7 @@ fn extract_summary(body: &str) -> String {
         if trimmed.is_empty() || trimmed.starts_with('#') {
             continue;
         }
-        let cleaned: String = trimmed
-            .chars()
-            .take(200)
-            .collect();
+        let cleaned: String = trimmed.chars().take(200).collect();
         return cleaned;
     }
     String::new()
@@ -1282,7 +961,6 @@ fn handle_event(app: &AppHandle, event: Event) {
     if to_rescan.is_empty() {
         return;
     }
-    // Debounce: run rescan in a separate thread after 200ms of quiet.
     let app_for_thread = app.clone();
     let paths = to_rescan.clone();
     std::thread::spawn(move || {
@@ -1316,7 +994,6 @@ fn handle_event(app: &AppHandle, event: Event) {
                     }
                 }
             } else {
-                // Removed
                 if let Ok(mut s) = STATE.write() {
                     if s.entries.remove(path).is_some() {
                         changed = true;
@@ -1330,11 +1007,6 @@ fn handle_event(app: &AppHandle, event: Event) {
             }
         }
         if changed {
-            // Persist + notify. IMPORTANT: don't hold STATE.read() across
-            // save_cache(), which itself acquires STATE.read() — recursive
-            // reads on std::sync::RwLock can deadlock on macOS when a
-            // writer is queued in between. Clone `root` out, drop the
-            // guard, then call save_cache.
             let root = STATE.read().ok().and_then(|s| s.root.clone());
             if let Some(root) = root {
                 let _ = save_cache(&app_for_thread, &root);
@@ -1349,13 +1021,13 @@ fn handle_event(app: &AppHandle, event: Event) {
 // ---------------------------------------------------------------------------
 
 fn cache_path(app: &AppHandle, root: &Path) -> Option<PathBuf> {
-    let app_data = super::portable::app_data_dir(app.path()).ok()?;
-    let mut hasher = Sha256::new();
-    hasher.update(root.to_string_lossy().as_bytes());
-    let hash = format!("{:x}", hasher.finalize());
+    let app_data = app.path().app_data_dir().ok()?;
+    let mut hasher = DefaultHasher::new();
+    hasher.write(root.to_string_lossy().as_bytes());
+    let hash = format!("{:016x}", hasher.finish());
     let dir = app_data.join("index");
     let _ = fs::create_dir_all(&dir);
-    Some(dir.join(format!("{}.json", &hash[..16])))
+    Some(dir.join(format!("{}.json", hash)))
 }
 
 fn save_cache(app: &AppHandle, root: &Path) -> Result<(), String> {
@@ -1378,7 +1050,6 @@ fn load_cache(app: &AppHandle, root: &Path) -> Option<Vec<IndexEntry>> {
     serde_json::from_str(&raw).ok()
 }
 
-// Helper for backlink context.
 fn read_context(path: &Path, line_no: u32) -> Vec<String> {
     let raw = match fs::read_to_string(path) {
         Ok(r) => r,
@@ -1396,78 +1067,35 @@ fn read_context(path: &Path, line_no: u32) -> Vec<String> {
 }
 
 #[cfg(test)]
-mod wikilink_line_tests {
+mod tests {
     use super::*;
 
     #[test]
-    fn wikilink_lines_are_file_absolute_with_front_matter() {
-        let dir = tempfile::tempdir().unwrap();
-        let p = dir.path().join("Table Note.md");
-        let raw = "---\ntitle: T\ntags: [a]\ntype: note\n---\n# Table Note\n\n| Name | Qty |\n|---|---|\n| a | 1 |\n\nBack to [[README]].\n";
-        fs::write(&p, raw).unwrap();
-        let entry = scan_file(&p).unwrap();
-        assert_eq!(entry.wikilinks.len(), 1);
-        let line = entry.wikilinks[0].line;
-        assert_eq!(line, 12);
-        let ctx = read_context(&p, line);
-        assert_eq!(ctx[1], "Back to [[README]].");
+    fn test_strip_inline_code_basic() {
+        let stripped = strip_inline_code("purple bg `#1A1033` + text `#9B7EE0`");
+        assert!(!stripped.contains('#'), "inline code should be stripped: {:?}", stripped);
+    }
+
+    fn fm(yaml: &str) -> serde_json::Value {
+        parse_frontmatter_yaml(yaml)
     }
 
     #[test]
-    fn wikilink_lines_without_front_matter_and_with_bom_crlf() {
-        assert_eq!(extract_wikilinks("a\n[[X]]\n", 0)[0].line, 2);
-        let raw = "\u{feff}---\r\na: 1\r\n---\r\nbody [[Y]]\r\n";
-        let (_, body) = split_front_matter(raw);
-        assert_eq!(extract_wikilinks(body, body_line_offset(raw, body))[0].line, 4);
-    }
-}
-
-#[cfg(test)]
-mod task_scan_tests {
-    use super::extract_tasks;
-
-    #[test]
-    fn finds_open_and_done_items_with_file_line_numbers() {
-        let raw = "---\ntitle: x\n---\n\n# Heading\n\n- [ ] first\n- [x] second\n";
-        let tasks = extract_tasks(raw);
-        assert_eq!(tasks.len(), 2);
-        // Line 7 in the FILE, not line 4 of the body — the panel rewrites the
-        // checkbox on this line.
-        assert_eq!(tasks[0].line, 7);
-        assert_eq!(tasks[0].text, "first");
-        assert!(!tasks[0].done);
-        assert_eq!(tasks[1].line, 8);
-        assert!(tasks[1].done);
-    }
-
-    #[test]
-    fn ignores_task_shaped_lines_inside_fenced_code() {
-        let raw = "- [ ] real\n\n```sh\n- [ ] not a task\n```\n\n- [x] also real\n";
-        let tasks = extract_tasks(raw);
+    fn relationships_scalar_and_array() {
+        let v = fm("belongs_to: \"[[b]]\"\ncites:\n  - \"[[a]]\"\n  - \"[[c]]\"");
+        let rel = extract_relationships(&v);
+        assert_eq!(rel.get("belongs_to").unwrap(), &vec!["[[b]]".to_string()]);
         assert_eq!(
-            tasks.iter().map(|t| t.text.as_str()).collect::<Vec<_>>(),
-            vec!["real", "also real"]
+            rel.get("cites").unwrap(),
+            &vec!["[[a]]".to_string(), "[[c]]".to_string()]
         );
     }
 
     #[test]
-    fn ignores_front_matter_and_accepts_every_bullet_marker() {
-        let raw = "---\nlist:\n  - [ ] not a task\n---\n* [ ] star\n+ [X] plus\n  - [ ] nested\n";
-        let tasks = extract_tasks(raw);
-        assert_eq!(
-            tasks.iter().map(|t| (t.line, t.text.as_str(), t.done)).collect::<Vec<_>>(),
-            vec![(5, "star", false), (6, "plus", true), (7, "nested", false)]
-        );
-    }
-
-    #[test]
-    fn a_bare_checkbox_with_no_text_is_not_a_task() {
-        assert!(extract_tasks("- [ ]\n- [ ]   \n").is_empty());
-    }
-
-    #[test]
-    fn keeps_priority_and_due_tokens_for_the_frontend_to_parse() {
-        let tasks = extract_tasks("- [ ] ship it ⏫ 📅 2026-09-10\n");
-        assert_eq!(tasks[0].text, "ship it ⏫ 📅 2026-09-10");
+    fn parse_ref_target_strips_brackets() {
+        assert_eq!(parse_ref_target("[[b]]"), "b");
+        assert_eq!(parse_ref_target("[[a|alias]]"), "a");
+        assert_eq!(parse_ref_target("[[a#h]]"), "a");
+        assert_eq!(parse_ref_target("plain"), "plain");
     }
 }

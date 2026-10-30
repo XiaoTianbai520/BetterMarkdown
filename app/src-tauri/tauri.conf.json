@@ -7,7 +7,6 @@
     "beforeDevCommand": "pnpm dev",
     "devUrl": "http://localhost:1420",
     "beforeBuildCommand": "pnpm build",
-    "beforeBundleCommand": "bash ../scripts/build-mcp-sidecar.sh",
     "frontendDist": "../dist"
   },
   "app": {
@@ -18,11 +17,7 @@
         "height": 800,
         "minWidth": 480,
         "minHeight": 360,
-        "visible": false,
-        "center": true,
-        "titleBarStyle": "Overlay",
-        "hiddenTitle": true,
-        "trafficLightPosition": { "x": 20, "y": 20 }
+        "center": true
       }
     ],
     "security": {
@@ -65,33 +60,7 @@
         "role": "Editor",
         "mimeType": "text/markdown"
       }
-    ],
-    "windows": {
-      "nsis": {
-        "installMode": "currentUser",
-        "installerIcon": "icons/icon.ico",
-        "displayLanguageSelector": false,
-        "installerHooks": "installer.nsh"
-      },
-      "wix": {
-        "bannerPath": "windows/banner.bmp",
-        "dialogImagePath": "windows/dialog.bmp"
-      }
-    },
-    "resources": [
-      "icons/file_icon.ico",
-      "resources/dicts/en_US.aff",
-      "resources/dicts/en_US.dic"
-    ],
-    "externalBin": [
-      "binaries/solomd-mcp"
-    ],
-    "macOS": {
-      "minimumSystemVersion": "10.15"
-    },
-    "iOS": {
-      "minimumSystemVersion": "15.0"
-    }
+    ]
   },
   "plugins": {
     "opener": {
