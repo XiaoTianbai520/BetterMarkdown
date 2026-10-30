@@ -1,0 +1,72 @@
+# Dependencies
+**/node_modules/
+**/target/
+**/dist/
+
+# Tauri build artifacts
+**/src-tauri/gen/
+**/src-tauri/target/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
+*.swp
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Brand experimental output
+brand/test_response.json
+brand/*_error.json
+
+# Local secrets — never commit
+.env.local
+.env.*.local
+*.p12
+*.pem
+*.cer
+solomd-*.txt
+
+# Distribution binaries (use GitHub Releases instead)
+distribution/windows/
+distribution/macos/
+distribution/linux/
+winget-pkgs
+
+# ai assist
+CLAUDE.md
+# Everything under .claude/ is local — worktrees alone are gigabytes — except
+# the skills, which are shared tooling. A skill that lives on one disk is a
+# skill that goes missing: pack_msix.py did exactly that.
+.claude/*
+!.claude/skills/
+.claude/skills/**/.last-scan
+app/src-tauri/embedded.provisionprofile
+
+# Mac App Store distribution artifacts
+dist-mas/
+app/src-tauri/*.provisionprofile
+
+# Android release keystore — never commit
+.keystore/
+*.jks
+*.keystore
+
+# Android distribution artifacts (APK + AAB ship via GitHub Releases)
+dist-android/
+dist/
+
+# local-only strategy / scratch (never commit — public repo)
+.local/
+
+# Python bytecode from the release scripts
+__pycache__/
+*.pyc

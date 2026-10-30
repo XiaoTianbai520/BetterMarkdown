@@ -1,0 +1,209 @@
+<script setup lang="ts">
+/** v4.6 F1 — a single property row in the inspector: a 2-col layout of
+ *  [ label (+ display-mode menu, pin, delete-on-hover) | mode-specific value
+ *  cell ]. The row owns no write logic — it emits semantic events that the
+ *  PropertiesInspector wires to the properties store / Rust round-trip. */
+import { computed } from 'vue';
+import type { DisplayMode } from '../../lib/property-types';
+import { useI18n } from '../../i18n';
+import DisplayModeMenu from './DisplayModeMenu.vue';
+import Icons from '../Icons.vue';
+import TextCell from './value-cells/TextCell.vue';
+import NumberCell from './value-cells/NumberCell.vue';
+import BooleanCell from './value-cells/BooleanCell.vue';
+import DateCell from './value-cells/DateCell.vue';
+import StatusCell from './value-cells/StatusCell.vue';
+import UrlCell from './value-cells/UrlCell.vue';
+import TagsCell from './value-cells/TagsCell.vue';
+import RelationCell from './value-cells/RelationCell.vue';
+
+const props = defineProps<{
+  propKey: string;
+  value: unknown;
+  mode: DisplayMode;
+  pinned: boolean;
+}>();
+
+const emit = defineEmits<{
+  update: [unknown];
+  remove: [];
+  recast: [DisplayMode];
+  togglePin: [];
+}>();
+
+const { t } = useI18n();
+
+const isPlaceholder = computed(() => props.value == null || props.value === '');
+</script>
+
+<template>
+  <div class="prop-row">
+    <div class="prop-row__label">
+      <button
+        type="button"
+        class="prop-row__pin"
+        :class="{ 'prop-row__pin--on': pinned }"
+        :title="pinned ? t('inspector.unpin') : t('inspector.pin')"
+        :aria-label="pinned ? t('inspector.unpin') : t('inspector.pin')"
+        :aria-pressed="pinned"
+        @click="emit('togglePin')"
+      >
+        <svg
+          width="12"
+          height="12"
+          viewBox="0 0 24 24"
+          :fill="pinned ? 'currentColor' : 'none'"
+          stroke="currentColor"
+          stroke-width="1.8"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          aria-hidden="true"
+        >
+          <path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z" />
+        </svg>
+      </button>
+      <span class="prop-row__key" :title="propKey">{{ propKey }}</span>
+      <span class="prop-row__meta">
+        <DisplayModeMenu :effective-mode="mode" :value="value" @recast="emit('recast', $event)" />
+        <button
+          type="button"
+          class="prop-row__del"
+          :title="t('inspector.deleteProperty')"
+          :aria-label="t('inspector.deleteProperty')"
+          @click="emit('remove')"
+        ><Icons name="close" :size="12" /></button>
+      </span>
+    </div>
+
+    <div class="prop-row__value" :class="{ 'prop-row__value--placeholder': isPlaceholder }">
+      <BooleanCell v-if="mode === 'boolean'" :value="value" @update="emit('update', $event)" />
+      <NumberCell v-else-if="mode === 'number'" :value="value" @update="emit('update', $event)" />
+      <DateCell v-else-if="mode === 'date'" :value="value" @update="emit('update', $event)" />
+      <StatusCell v-else-if="mode === 'status'" :value="value" @update="emit('update', $event)" />
+      <UrlCell v-else-if="mode === 'url'" :value="value" @update="emit('update', $event)" />
+      <TagsCell v-else-if="mode === 'tags'" :value="value" :prop-key="propKey" @update="emit('update', $event)" />
+      <RelationCell v-else-if="mode === 'relation'" :value="value" @update="emit('update', $event)" />
+      <TextCell v-else :value="value" @update="emit('update', $event)" />
+    </div>
+  </div>
+</template>
+
+<style scoped>
+.prop-row {
+  display: grid;
+  grid-template-columns: minmax(92px, 38%) 1fr;
+  column-gap: 8px;
+  align-items: start;
+  min-height: 28px;
+  padding: 2px 4px;
+  border-radius: 7px;
+  transition: background var(--dur-fast) var(--ease);
+}
+.prop-row {
+  --prop-row-hover: color-mix(in srgb, var(--text) 5%, var(--bg));
+}
+.prop-row:hover {
+  background: var(--prop-row-hover);
+}
+.prop-row__label {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+  min-height: 24px;
+}
+.prop-row__pin {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 16px;
+  height: 16px;
+  margin-left: -2px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--r-xs);
+  background: transparent;
+  color: var(--text-3);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease);
+}
+.prop-row:hover .prop-row__pin,
+.prop-row:focus-within .prop-row__pin,
+.prop-row__pin--on {
+  opacity: 1;
+}
+.prop-row__pin:hover {
+  color: var(--text);
+}
+.prop-row__pin--on,
+.prop-row__pin--on:hover {
+  color: var(--accent);
+}
+.prop-row__pin:focus-visible,
+.prop-row__del:focus-visible {
+  outline: none;
+  opacity: 1;
+  box-shadow: var(--ring);
+}
+.prop-row__key {
+  min-width: 0;
+  font-size: 12px;
+  color: var(--text-3);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* Row actions float over the end of the label instead of reserving room
+   for themselves — an invisible-but-present menu used to squeeze keys like
+   `status` down to "s…". They sit on the same opaque hover colour as the
+   row so a long key fades under them cleanly. */
+.prop-row__label {
+  position: relative;
+}
+.prop-row__meta {
+  position: absolute;
+  top: 50%;
+  right: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 0;
+  padding-left: 10px;
+  transform: translateY(-50%);
+  background: linear-gradient(to right, transparent, var(--prop-row-hover) 10px);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--dur-fast) var(--ease);
+}
+.prop-row:hover .prop-row__meta,
+.prop-row:focus-within .prop-row__meta {
+  opacity: 1;
+  pointer-events: auto;
+}
+.prop-row__del {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--r-xs);
+  background: transparent;
+  color: var(--text-3);
+  cursor: pointer;
+}
+.prop-row__del:hover {
+  background: var(--fill-1);
+  color: var(--danger);
+}
+.prop-row__value {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  min-height: 24px;
+  font-size: 13px;
+  color: var(--text);
+}
+</style>

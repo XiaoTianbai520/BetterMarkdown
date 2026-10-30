@@ -1,0 +1,275 @@
+/**
+ * CodeMirror 6 live-preview extensions for Markdown.
+ *
+ * Two pieces:
+ *   1. `markdownRichStyle` — a HighlightStyle that makes headings bigger,
+ *      bold actually bold, code monospaced with accent color, etc.
+ *   2. `liveMarkdownPlugin` — a ViewPlugin that hides marker characters
+ *      (`#`, `**`, `*`, `` ` ``, `[`, `]`, `(`, `)` …) on every line that
+ *      does NOT currently contain (or touch) the user selection. Move the
+ *      cursor onto a heading line and the `#` re-appears so you can edit it.
+ *
+ * Combined effect: a Typora / Obsidian Live Preview style experience while
+ * keeping the underlying buffer as plain markdown source.
+ */
+
+import { syntaxTree, HighlightStyle, syntaxHighlighting } from '@codemirror/language';
+import { Prec, RangeSetBuilder } from '@codemirror/state';
+import {
+  Decoration,
+  DecorationSet,
+  EditorView,
+  ViewPlugin,
+  ViewUpdate,
+} from '@codemirror/view';
+import { frozenDuringComposition, isImeSafeFlushTransaction } from './cm-ime-guard';
+import { tags as t } from '@lezer/highlight';
+import { isDragging, isDragEndTransaction } from './cm-drag-aware';
+import { bulletDeco, hrDeco, listItemHasTask, type MdSyntaxNode } from './cm-live-render';
+
+// Marker node names (from @lezer/markdown) we want to hide off-line.
+// LinkMark (brackets) and CodeMark (backticks) intentionally kept visible —
+// hiding them makes `![alt](url)` and `` `code` `` look like plain text and
+// loses the visual hint that it's a link or inline code.
+const HIDDEN_MARK_NODES = new Set<string>([
+  'HeaderMark',
+  'EmphasisMark',
+  'StrikethroughMark',
+]);
+
+const hideDeco = Decoration.replace({});
+
+// #353 "Always show Markdown markers": nothing is hidden or replaced, so the
+// rendered styling (heading size, bold) stays and no line reflows when the
+// caret moves. Markers are dimmed so they read as syntax, not text.
+const markerMark = Decoration.mark({ class: 'cm-md-marker' });
+
+const makeLiveMarkdownPlugin = (showMarkers: boolean) => ViewPlugin.fromClass(
+  class {
+    decorations: DecorationSet;
+
+    constructor(view: EditorView) {
+      this.decorations = this.build(view);
+    }
+
+    update(update: ViewUpdate) {
+      // IME composition guard (#108) — see cm-ime-guard.ts. Rebuilding the
+      // marker-hiding decorations on the composing line aborts the Sogou IME
+      // on Windows; freeze + map-through-changes until composition commits.
+      const frozen = frozenDuringComposition(update, this.decorations);
+      if (frozen) {
+        this.decorations = frozen;
+        return;
+      }
+      // Skip marker-toggle rebuilds during pointer drag-selection — see
+      // cm-drag-aware.ts for the Windows WebView2 pointer-capture reason.
+      const dragEnded = update.transactions.some(isDragEndTransaction);
+      const imeFlush = update.transactions.some(isImeSafeFlushTransaction);
+      if (update.docChanged || update.viewportChanged || dragEnded || imeFlush) {
+        this.decorations = this.build(update.view);
+        return;
+      }
+      if (!showMarkers && update.selectionSet && !isDragging(update.state)) {
+        this.decorations = this.build(update.view);
+      }
+    }
+
+    build(view: EditorView): DecorationSet {
+      const builder = new RangeSetBuilder<Decoration>();
+      const sel = view.state.selection.main;
+      const fromLine = view.state.doc.lineAt(sel.from).number;
+      const toLine = view.state.doc.lineAt(sel.to).number;
+      const tree = syntaxTree(view.state);
+
+      for (const { from, to } of view.visibleRanges) {
+        tree.iterate({
+          from,
+          to,
+          enter: (node) => {
+            const name = node.name;
+            const line = view.state.doc.lineAt(node.from).number;
+            // Keep everything raw on the line(s) the cursor / selection touches.
+            const onCaretLine = line >= fromLine && line <= toLine;
+
+            if (HIDDEN_MARK_NODES.has(name)) {
+              if (showMarkers) {
+                if (node.to > node.from) builder.add(node.from, node.to, markerMark);
+                return;
+              }
+              if (onCaretLine) return;
+              // v4.3.5 #83 — gulp the single trailing space after the ATX
+              // marker so H1..H6 text aligns at the same visual column. Each
+              // heading line has its own font-size; a leftover " " character
+              // at 1.85em vs 1.1em prints visibly different widths and made
+              // the headings look staggered.
+              let to_ = node.to;
+              if (name === 'HeaderMark') {
+                const lineObj = view.state.doc.lineAt(node.from);
+                if (lineObj.from === node.from && node.to - node.from <= 6) {
+                  const after = view.state.doc.sliceString(node.to, Math.min(node.to + 1, view.state.doc.length));
+                  if (after === ' ') to_ = node.to + 1;
+                }
+              }
+              builder.add(node.from, to_, hideDeco);
+              return;
+            }
+
+            // v4.7.1 — same list / horizontal-rule rendering as the liveEdit
+            // extension (cm-live-render.ts), so the edit-mode livePreview toggle
+            // is consistent: a heading that renders shouldn't sit above a bullet
+            // list that doesn't.
+            if (name === 'ListMark') {
+              if (showMarkers || onCaretLine || node.to <= node.from) return;
+              const mark = view.state.doc.sliceString(node.from, node.to);
+              const isBullet = mark === '-' || mark === '*' || mark === '+';
+              if (!isBullet) return; // ordered list keeps its number
+              if (listItemHasTask(node.node as unknown as MdSyntaxNode)) {
+                const after = view.state.doc.sliceString(
+                  node.to,
+                  Math.min(node.to + 1, view.state.doc.length),
+                );
+                builder.add(node.from, after === ' ' ? node.to + 1 : node.to, hideDeco);
+              } else {
+                builder.add(node.from, node.to, bulletDeco);
+              }
+              return;
+            }
+            if (name === 'HorizontalRule') {
+              if (showMarkers || onCaretLine || node.to <= node.from) return;
+              builder.add(node.from, node.to, hrDeco);
+              return;
+            }
+          },
+        });
+      }
+      return builder.finish();
+    }
+  },
+  { decorations: (v) => v.decorations }
+);
+
+// Rich syntax highlighting for markdown tokens. Sizes are in `em` so they
+// scale with the user's font-size setting. Heading colors gradient from
+// stronger (h1) to softer (h6) for visual hierarchy.
+export const markdownRichStyle = HighlightStyle.define([
+  // 5.0 §2 type scale (30/650, 20/620, 17/600 at the 16px default).
+  { tag: t.heading1, fontSize: '1.875em', fontWeight: '650', lineHeight: '1.25', letterSpacing: '-0.015em', color: 'var(--md-h1)' },
+  { tag: t.heading2, fontSize: '1.25em', fontWeight: '620', lineHeight: '1.3', color: 'var(--md-h2)' },
+  { tag: t.heading3, fontSize: '1.0625em', fontWeight: '600', color: 'var(--md-h3)' },
+  { tag: t.heading4, fontWeight: '600', color: 'var(--md-h4)' },
+  { tag: t.heading5, fontWeight: '600', color: 'var(--md-h5)' },
+  { tag: t.heading6, fontWeight: '600', color: 'var(--md-h6)' },
+  { tag: t.strong, fontWeight: '700', color: 'var(--md-strong)' },
+  { tag: t.emphasis, fontStyle: 'italic', color: 'var(--md-em)' },
+  { tag: t.strikethrough, textDecoration: 'line-through', color: 'var(--text-muted)' },
+  { tag: t.link, color: 'var(--accent-text)', textDecoration: 'underline' },
+  { tag: t.url, color: 'var(--accent-text)', textDecoration: 'underline' },
+  { tag: t.monospace, fontFamily: 'var(--font-mono)', color: 'var(--text)', backgroundColor: 'var(--fill-1)' },
+  { tag: t.quote, color: 'var(--text-2)' },
+  { tag: t.processingInstruction, color: 'var(--text-3)' },
+  { tag: t.contentSeparator, color: 'var(--text-3)' },
+  // Code block syntax highlighting (provided by nested language packages)
+  { tag: t.keyword, color: 'var(--syn-keyword)' },
+  { tag: t.string, color: 'var(--syn-string)' },
+  { tag: t.number, color: 'var(--syn-number)' },
+  { tag: t.comment, color: 'var(--syn-comment)', fontStyle: 'italic' },
+  { tag: t.function(t.variableName), color: 'var(--syn-function)' },
+  { tag: t.variableName, color: 'var(--syn-variable)' },
+  { tag: t.typeName, color: 'var(--syn-type)' },
+  { tag: t.className, color: 'var(--syn-type)' },
+  { tag: t.propertyName, color: 'var(--syn-property)' },
+  { tag: t.operator, color: 'var(--syn-operator)' },
+  { tag: t.punctuation, color: 'var(--text-muted)' },
+  { tag: t.bracket, color: 'var(--text-muted)' },
+  { tag: t.bool, color: 'var(--syn-number)' },
+  { tag: t.null, color: 'var(--syn-number)' },
+  { tag: t.tagName, color: 'var(--syn-keyword)' },
+  { tag: t.attributeName, color: 'var(--syn-property)' },
+  { tag: t.attributeValue, color: 'var(--syn-string)' },
+]);
+
+// Visual polish: dim marker chars when they ARE visible (active line),
+// give code blocks a subtle background.
+const liveTheme = EditorView.theme({
+  '.cm-line': {
+    fontVariantLigatures: 'none',
+  },
+  '.cm-md-marker': {
+    color: 'var(--text-faint)',
+    fontWeight: 'normal',
+    fontStyle: 'normal',
+  },
+  '.tok-meta, .cm-formatting, .ͼe': {
+    color: 'var(--text-faint)',
+  },
+  // CM6's `layer` extension writes inline `style="z-index: -2"` on
+  // `.cm-selectionLayer`, parking selection beneath the per-char
+  // backgrounds painted by `t.monospace`. Need `!important` to beat
+  // the inline style; 45% alpha keeps glyphs readable underneath.
+  // #368 — once the layer sits ABOVE the text its rectangles swallow every
+  // mousedown inside the selection: the event never reaches `.cm-content`,
+  // so CodeMirror can't collapse the selection on click (after Select All
+  // there is nowhere left to click). The layer is purely visual — let
+  // pointer events fall through to the text, as CM's own cursor layer does.
+  '.cm-selectionLayer': { zIndex: '2 !important', pointerEvents: 'none' },
+  '.cm-selectionBackground': {
+    backgroundColor: 'var(--accent-soft) !important',
+  },
+});
+
+const liveMarkdownPlugin = makeLiveMarkdownPlugin(false);
+const liveMarkdownPluginShowMarkers = makeLiveMarkdownPlugin(true);
+
+/** Full live-preview extension bundle. Pass `[]` to disable. */
+export function livePreviewExtension(opts: { showMarkers?: boolean } = {}) {
+  return [
+    syntaxHighlighting(markdownRichStyle),
+    opts.showMarkers ? liveMarkdownPluginShowMarkers : liveMarkdownPlugin,
+    liveTheme,
+  ];
+}
+
+/** Just the rich highlight style without hiding markers (raw source mode). */
+// Plain-source highlight used when the livePreview toggle is OFF. Unlike
+// `markdownRichStyle` it applies NO font-size / font-weight / italic changes
+// to markdown structure — headings stay body-sized, `**bold**` and `# head`
+// read as literal source. Only light token COLORS remain (plus full syntax
+// highlighting inside fenced code, which is genuinely code). This keeps the
+// source ↔ live toggle meaningfully distinct: "off" is plain editing, "on" is
+// a rendered preview — instead of both looking like a preview. (User ask,
+// 2026-06-20: "没打开实时预览时标题还是被预览了 / 两个按钮等于一样了".)
+export const markdownPlainStyle = HighlightStyle.define([
+  { tag: t.heading1, color: 'var(--md-h1)', fontWeight: 'normal', textDecoration: 'none' },
+  { tag: t.heading2, color: 'var(--md-h2)', fontWeight: 'normal', textDecoration: 'none' },
+  { tag: t.heading3, color: 'var(--md-h3)', fontWeight: 'normal', textDecoration: 'none' },
+  { tag: t.heading4, color: 'var(--md-h4)', fontWeight: 'normal', textDecoration: 'none' },
+  { tag: t.heading5, color: 'var(--md-h5)', fontWeight: 'normal', textDecoration: 'none' },
+  { tag: t.heading6, color: 'var(--md-h6)', fontWeight: 'normal', textDecoration: 'none' },
+  { tag: t.heading, fontWeight: 'normal', textDecoration: 'none' },
+  { tag: t.strong, color: 'var(--md-strong)', fontWeight: 'normal' },
+  { tag: t.emphasis, color: 'var(--md-em)', fontStyle: 'normal' },
+  { tag: t.strikethrough, color: 'var(--text-muted)', textDecoration: 'none' },
+  { tag: t.link, color: 'var(--md-link)', textDecoration: 'none' },
+  { tag: t.url, color: 'var(--md-url)', textDecoration: 'none' },
+  { tag: t.monospace, fontFamily: 'var(--font-mono)', color: 'var(--md-code)' },
+  { tag: t.quote, color: 'var(--md-quote)', fontStyle: 'normal' },
+  { tag: t.list, color: 'var(--md-list)' },
+  { tag: t.processingInstruction, color: 'var(--text-faint)' },
+  { tag: t.contentSeparator, color: 'var(--md-hr)' },
+  // Fenced-code syntax — genuinely code, keep the colors (no size changes).
+  { tag: t.keyword, color: 'var(--syn-keyword)' },
+  { tag: t.string, color: 'var(--syn-string)' },
+  { tag: t.number, color: 'var(--syn-number)' },
+  { tag: t.comment, color: 'var(--syn-comment)' },
+  { tag: t.function(t.variableName), color: 'var(--syn-function)' },
+  { tag: t.variableName, color: 'var(--syn-variable)' },
+  { tag: t.typeName, color: 'var(--syn-type)' },
+  { tag: t.propertyName, color: 'var(--syn-property)' },
+  { tag: t.operator, color: 'var(--syn-operator)' },
+  { tag: t.punctuation, color: 'var(--text-muted)' },
+  { tag: t.bracket, color: 'var(--text-muted)' },
+]);
+
+export function richHighlightOnly() {
+  return [Prec.high(syntaxHighlighting(markdownPlainStyle)), liveTheme];
+}
