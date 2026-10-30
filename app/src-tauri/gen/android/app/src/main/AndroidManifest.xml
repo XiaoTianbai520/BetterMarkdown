@@ -1,16 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <uses-permission android:name="android.permission.INTERNET" />
-    <uses-permission android:name="com.android.vending.BILLING" />
     <!-- #148 — folder-vault access is via the Storage Access Framework
          (ACTION_OPEN_DOCUMENT_TREE + ContentResolver, see saf_android.rs), which
          needs NO storage permission and works on every OEM including Honor/Huawei
          Magic OS. MANAGE_EXTERNAL_STORAGE was removed in 4.9.6: it granted nothing
          on those ROMs, the app no longer uses it (openFolder() launches SAF
          directly), and Play requires a sensitive-permission declaration for it. -->
-
-    <!-- AndroidTV support -->
-    <uses-feature android:name="android.software.leanback" android:required="false" />
 
     <!-- #224 — the text-selection toolbar is built inside our own process via
          PackageManager.queryIntentActivities(PROCESS_TEXT). Since Android 11
@@ -38,8 +34,6 @@
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
-                <!-- AndroidTV support -->
-                <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
             </intent-filter>
 
             <!-- File association: open .md / .markdown / .mdown / .mkd / .txt

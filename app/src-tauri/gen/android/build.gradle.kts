@@ -30,3 +30,8 @@ allprojects {
 tasks.register("clean").configure {
     delete("build")
 }
+
+tasks.named<Wrapper>("wrapper") {
+    gradleVersion = "8.13"
+    distributionType = Wrapper.DistributionType.BIN
+}
