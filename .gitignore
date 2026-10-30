@@ -70,3 +70,6 @@ dist/
 # Python bytecode from the release scripts
 __pycache__/
 *.pyc
+
+release-apk/
+*.apk
