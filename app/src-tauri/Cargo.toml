@@ -1,0 +1,48 @@
+[package]
+name = "solomd"
+version = "5.0.9"
+description = "SoloMD — a lightweight, cross-platform Markdown + plain text editor"
+authors = ["zhitong"]
+edition = "2021"
+autobins = false
+
+[[bin]]
+name = "SoloMD"
+path = "src/main.rs"
+
+[profile.release]
+opt-level = "z"
+lto = "fat"
+codegen-units = 1
+strip = "symbols"
+incremental = false
+
+[lib]
+name = "app_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = ["protocol-asset", "image-png"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+chardetng = "1.0.0"
+encoding_rs = "0.8.35"
+walkdir = "2.5.0"
+notify = "8"
+notify-debouncer-mini = "0.7"
+tokio = { version = "1", features = ["rt", "sync", "macros"] }
+tauri-plugin-fs = "2"
+tauri-plugin-dialog = "2"
+tauri-plugin-clipboard-manager = "2"
+tauri-plugin-opener = "2"
+tauri-plugin-deep-link = "2"
+
+[target.'cfg(target_os = "android")'.dependencies]
+jni = "0.21"
+ndk-context = "0.1"
+
+[dev-dependencies]
+tempfile = "3"
