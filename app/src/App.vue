@@ -10,6 +10,16 @@ import {
 } from 'vue';
 import { invoke } from '@tauri-apps/api/core';
 
+// Phone status bar clock (Markor-style)
+const phoneTime = ref('');
+function updatePhoneTime() {
+  const now = new Date();
+  const h = String(now.getHours()).padStart(2, '0');
+  const m = String(now.getMinutes()).padStart(2, '0');
+  phoneTime.value = `${h}:${m}`;
+}
+let clockTimer: ReturnType<typeof setInterval> | null = null;
+
 // Stores & Composables
 import { useTabsStore } from './stores/tabs';
 import { useSettingsStore } from './stores/settings';
@@ -240,6 +250,10 @@ function onWindowBlur() {
 }
 
 onMounted(async () => {
+  // Initialize phone status bar clock
+  updatePhoneTime();
+  clockTimer = setInterval(updatePhoneTime, 30000);
+
   // If no note is open, create a default Untitled note
   if (tabs.tabs.length === 0) {
     tabs.newTab({ fileName: 'Untitled.md', language: 'markdown' });
@@ -261,6 +275,7 @@ onMounted(async () => {
 });
 
 onBeforeUnmount(() => {
+  if (clockTimer) clearInterval(clockTimer);
   window.removeEventListener('solomd:file-opened', onFileOpened);
   window.removeEventListener('blur', onWindowBlur);
 });
@@ -268,7 +283,31 @@ onBeforeUnmount(() => {
 
 <template>
   <div class="mobile-app" :data-theme="dataThemeFor(settings.theme, !!settings.customCssPath)">
-    <!-- 1. Mobile Top Bar -->
+    <!-- 0. Phone Status Bar (Markor-style) -->
+    <div class="phone-statusbar">
+      <span class="phone-statusbar__time">{{ phoneTime }}</span>
+      <div class="phone-statusbar__right">
+        <svg class="phone-statusbar__icon" viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+          <path d="M12 3C7.95 3 4.21 4.34 1.2 6.6c3.41 4.56 6.07 7.46 7.63 9.23.78.88 1.28 1.45 1.7 1.66.42.21 1.05.21 1.47 0 .42-.21.92-.78 1.7-1.66 1.56-1.77 4.22-4.67 7.63-9.23C19.79 4.34 16.05 3 12 3z" opacity="0.6"/>
+          <circle cx="12" cy="12" r="2"/>
+        </svg>
+        <span class="phone-statusbar__signal">5G</span>
+        <svg class="phone-statusbar__wifi" viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+          <path d="M12 18l3.5-4.5c-1-0.8-2.2-1.3-3.5-1.3s-2.5 0.5-3.5 1.3L12 18z" opacity="0.8"/>
+          <path d="M12 12c2.2 0 4.2 0.8 5.8 2.2l1.4-1.8C17.2 10.6 14.7 9.5 12 9.5s-5.2 1.1-7.2 2.9l1.4 1.8C7.8 12.8 9.8 12 12 12z" opacity="0.6"/>
+          <path d="M12 7c3.3 0 6.4 1.2 8.8 3.2l1.2-1.6C19.3 6.2 15.8 4.8 12 4.8s-7.3 1.4-10 3.8l1.2 1.6C5.6 8.2 8.7 7 12 7z" opacity="0.4"/>
+        </svg>
+        <div class="phone-statusbar__battery">
+          <div class="phone-statusbar__battery-body">
+            <div class="phone-statusbar__battery-fill"></div>
+          </div>
+          <div class="phone-statusbar__battery-cap"></div>
+          <span class="phone-statusbar__battery-text">79</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 1. Mobile Top Bar (Markor-style: minimal, filename + unsaved dot) -->
     <header class="mobile-topbar">
       <div class="mobile-topbar__left">
         <button
@@ -483,25 +522,109 @@ onBeforeUnmount(() => {
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  background: var(--bg, #ffffff);
-  color: var(--text, #111111);
+  background: #1a1a1a;
+  color: #ffffff;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   position: relative;
   user-select: none;
 }
 
-/* Mobile Topbar */
+/* ── Phone Status Bar (Markor-style) ──────────────────────────── */
+/* Simulates the Android system status bar: dark, minimal, with time
+   on the left and signal/wifi/battery on the right. This creates the
+   visual offset that aligns the app bar with the reference layout. */
+.phone-statusbar {
+  height: 28px;
+  min-height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 12px;
+  background: #1a1a1a;
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 500;
+  flex-shrink: 0;
+  z-index: 60;
+  user-select: none;
+}
+
+.phone-statusbar__time {
+  letter-spacing: 0.5px;
+  font-variant-numeric: tabular-nums;
+}
+
+.phone-statusbar__right {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.phone-statusbar__icon {
+  opacity: 0.8;
+}
+
+.phone-statusbar__signal {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+}
+
+.phone-statusbar__wifi {
+  opacity: 0.7;
+}
+
+.phone-statusbar__battery {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.phone-statusbar__battery-body {
+  width: 22px;
+  height: 11px;
+  border: 1.2px solid rgba(255, 255, 255, 0.6);
+  border-radius: 3px;
+  padding: 1px;
+  position: relative;
+}
+
+.phone-statusbar__battery-fill {
+  width: 79%;
+  height: 100%;
+  background: #ffffff;
+  border-radius: 1px;
+}
+
+.phone-statusbar__battery-cap {
+  width: 2px;
+  height: 5px;
+  background: rgba(255, 255, 255, 0.6);
+  border-radius: 0 1px 1px 0;
+  margin-left: -1px;
+}
+
+.phone-statusbar__battery-text {
+  font-size: 11px;
+  font-weight: 500;
+  margin-left: 2px;
+}
+
+/* ── Mobile Topbar (Markor-style) ─────────────────────────────── */
+/* Dark, minimal app bar — filename + unsaved dot, aligned with the
+   reference page's upper bar position. */
 .mobile-topbar {
-  height: 48px;
-  min-height: 48px;
+  height: 44px;
+  min-height: 44px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 0 6px 0 8px;
-  background: var(--bg-sidebar, var(--bg));
-  border-bottom: var(--bd-hair, 1px solid rgba(0, 0, 0, 0.08));
+  background: #1a1a1a;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
   z-index: 50;
   user-select: none;
+  color: #ffffff;
 }
 
 .mobile-topbar__left {
@@ -530,7 +653,7 @@ onBeforeUnmount(() => {
 .topbar-title {
   font-size: 15px;
   font-weight: 600;
-  color: var(--text);
+  color: #ffffff;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -540,7 +663,7 @@ onBeforeUnmount(() => {
   width: 7px;
   height: 7px;
   border-radius: 50%;
-  background: var(--accent, #ff9f40);
+  background: #ff9f40;
   flex-shrink: 0;
 }
 
@@ -553,19 +676,22 @@ onBeforeUnmount(() => {
   border: 0;
   border-radius: var(--r-md, 8px);
   background: transparent;
-  color: var(--text);
+  color: #ffffff;
   cursor: pointer;
   touch-action: manipulation;
   transition: background 0.15s ease;
+  opacity: 0.85;
 }
 
 .topbar-btn:active {
-  background: var(--fill-2, rgba(0, 0, 0, 0.08));
+  background: rgba(255, 255, 255, 0.12);
+  opacity: 1;
 }
 
 .topbar-btn--active {
-  background: var(--accent-soft, rgba(255, 159, 64, 0.15));
-  color: var(--accent-text, #ff9f40);
+  background: rgba(255, 159, 64, 0.18);
+  color: #ff9f40;
+  opacity: 1;
 }
 
 /* More Menu */
@@ -584,10 +710,10 @@ onBeforeUnmount(() => {
   top: 44px;
   right: 4px;
   min-width: 160px;
-  background: var(--bg-elevated, var(--bg));
-  border: 1px solid var(--border, rgba(0, 0, 0, 0.15));
+  background: #2a2a2a;
+  border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: var(--r-md, 10px);
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
   padding: 6px;
   z-index: 100;
   display: flex;
@@ -605,14 +731,14 @@ onBeforeUnmount(() => {
   border: 0;
   border-radius: var(--r-sm, 6px);
   background: transparent;
-  color: var(--text);
+  color: #ffffff;
   font-size: 14px;
   cursor: pointer;
   touch-action: manipulation;
 }
 
 .more-menu-item:active {
-  background: var(--fill-2, rgba(0, 0, 0, 0.06));
+  background: rgba(255, 255, 255, 0.1);
 }
 
 /* Drawer */
@@ -640,13 +766,14 @@ onBeforeUnmount(() => {
   left: 0;
   width: 300px;
   max-width: 84vw;
-  background: var(--bg-sidebar, var(--bg));
+  background: #1a1a1a;
   z-index: 101;
   display: flex;
   flex-direction: column;
-  box-shadow: 2px 0 20px rgba(0, 0, 0, 0.18);
+  box-shadow: 2px 0 20px rgba(0, 0, 0, 0.4);
   transform: translateX(-100%);
   transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  color: #ffffff;
 }
 
 .drawer-sidebar--open {
@@ -659,7 +786,7 @@ onBeforeUnmount(() => {
   align-items: center;
   justify-content: space-between;
   padding: 0 12px;
-  border-bottom: var(--bd-hair, 1px solid rgba(0, 0, 0, 0.08));
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
   flex-shrink: 0;
 }
 
@@ -673,14 +800,14 @@ onBeforeUnmount(() => {
 }
 
 .drawer-vault-icon {
-  color: var(--accent, #ff9f40);
+  color: #ff9f40;
   flex-shrink: 0;
 }
 
 .drawer-vault-name {
   font-size: 14px;
   font-weight: 600;
-  color: var(--text);
+  color: #ffffff;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -689,17 +816,17 @@ onBeforeUnmount(() => {
 .drawer-switch-btn {
   height: 30px;
   padding: 0 10px;
-  border: 1px solid var(--border, rgba(0, 0, 0, 0.15));
+  border: 1px solid rgba(255, 255, 255, 0.15);
   border-radius: var(--r-sm, 6px);
-  background: var(--bg);
-  color: var(--text);
+  background: transparent;
+  color: #ffffff;
   font-size: 12px;
   cursor: pointer;
   flex-shrink: 0;
 }
 
 .drawer-switch-btn:active {
-  background: var(--fill-2, rgba(0, 0, 0, 0.08));
+  background: rgba(255, 255, 255, 0.1);
 }
 
 .drawer-tree-container {
@@ -726,7 +853,7 @@ onBeforeUnmount(() => {
   align-items: center;
   justify-content: center;
   gap: 12px;
-  color: var(--text-muted, #777);
+  color: #888;
 }
 
 .empty-icon {
@@ -746,8 +873,8 @@ onBeforeUnmount(() => {
   padding: 0 18px;
   border: 0;
   border-radius: var(--r-md, 8px);
-  background: var(--accent, #ff9f40);
-  color: var(--accent-fg, #fff);
+  background: #ff9f40;
+  color: #1a1a1a;
   font-size: 14px;
   font-weight: 500;
   cursor: pointer;
@@ -757,7 +884,7 @@ onBeforeUnmount(() => {
 .search-modal-scrim {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.5);
+  background: rgba(0, 0, 0, 0.6);
   z-index: 1000;
   display: flex;
   align-items: center;
@@ -769,19 +896,20 @@ onBeforeUnmount(() => {
   width: 100%;
   max-width: 540px;
   max-height: 85vh;
-  background: var(--bg);
+  background: #1a1a1a;
   border-radius: var(--r-lg, 12px);
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+  color: #ffffff;
 }
 
 /* Android restart prompt */
 .arn-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.5);
+  background: rgba(0, 0, 0, 0.6);
   z-index: 2000;
   display: flex;
   align-items: center;
@@ -789,13 +917,13 @@ onBeforeUnmount(() => {
   padding: 16px;
 }
 .arn {
-  background: var(--bg, #fff);
-  color: var(--text, #111);
+  background: #1a1a1a;
+  color: #ffffff;
   border-radius: var(--r-lg, 12px);
   width: 100%;
   max-width: 380px;
   padding: 20px;
-  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.4);
 }
 .arn__title {
   font-size: 16px;
@@ -805,7 +933,7 @@ onBeforeUnmount(() => {
 .arn__body {
   font-size: 14px;
   line-height: 1.6;
-  color: var(--text-2, #555);
+  color: #a9a6a0;
   margin: 0 0 16px;
 }
 .arn__foot {
@@ -817,15 +945,15 @@ onBeforeUnmount(() => {
   height: 36px;
   padding: 0 14px;
   border-radius: var(--r-md, 6px);
-  border: 1px solid var(--border, rgba(0, 0, 0, 0.15));
+  border: 1px solid rgba(255, 255, 255, 0.15);
   background: transparent;
-  color: var(--text, #111);
+  color: #ffffff;
   font-size: 13px;
   cursor: pointer;
 }
 .arn__btn--primary {
-  background: var(--accent, #ff9f40);
-  border-color: var(--accent, #ff9f40);
-  color: var(--accent-fg, #fff);
+  background: #ff9f40;
+  border-color: #ff9f40;
+  color: #1a1a1a;
 }
 </style>
