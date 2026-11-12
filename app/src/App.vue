@@ -620,7 +620,8 @@ onBeforeUnmount(() => {
   position: fixed;
   inset: 0;
   background: rgba(0, 0, 0, 0.4);
-  z-index: 100;
+  /* 层级叠加：置于顶栏之下，顶部栏不被遮罩盖住 */
+  z-index: 48;
   backdrop-filter: blur(2px);
 }
 
@@ -635,15 +636,19 @@ onBeforeUnmount(() => {
 
 .drawer-sidebar {
   position: fixed;
+  /* 铺满到屏幕顶部，不产生顶部空白块；靠 z-index 让顶栏压在其上 */
   top: 0;
   bottom: 0;
   left: 0;
   width: 300px;
   max-width: 84vw;
   background: var(--bg-sidebar, var(--bg));
-  z-index: 101;
+  /* 低于顶栏(50)、高于遮罩(48)：顶栏覆盖抽屉上沿，形成层级叠加 */
+  z-index: 49;
   display: flex;
   flex-direction: column;
+  /* 内容对齐顶栏下沿（顶栏 48px）；该区域由顶栏本身覆盖，不是空白 */
+  padding-top: 48px;
   box-shadow: 2px 0 20px rgba(0, 0, 0, 0.18);
   transform: translateX(-100%);
   transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
