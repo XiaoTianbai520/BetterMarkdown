@@ -516,12 +516,23 @@ onBeforeUnmount(() => {
 
 <style scoped>
 .mobile-app {
+  /* Android edge-to-edge (MainActivity.enableEdgeToEdge) draws the WebView
+     from y=0, i.e. *under* the system status bar. Reserve that height here so
+     the status bar, the app top bar and the drawer never overlap. env() is the
+     real inset on WebViews that report it; 40px is the fallback on those that
+     report 0 (one status-bar row). Both the top and bottom system bars are
+     accounted for; box-sizing:border-box keeps 100dvh from overflowing. */
+  --safe-top: max(env(safe-area-inset-top, 0px), 40px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  box-sizing: border-box;
   width: 100vw;
   height: 100vh;
   height: 100dvh;
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  padding-top: var(--safe-top);
+  padding-bottom: var(--safe-bottom);
   background: #1a1a1a;
   color: #ffffff;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
@@ -534,9 +545,12 @@ onBeforeUnmount(() => {
    on the left and signal/wifi/battery on the right. This creates the
    visual offset that aligns the app bar with the reference layout. */
 .phone-statusbar {
+  /* 真机已有系统状态栏；edge-to-edge 下再画一条模拟栏只会重复显示时间 /
+     信号 / 电量，也容易与系统栏重叠。整条隐藏，只保留系统状态栏；DOM 与
+     计时逻辑保留，便于日后需要时恢复。 */
+  display: none !important;
   height: 28px;
   min-height: 28px;
-  display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 0 12px;
@@ -545,6 +559,8 @@ onBeforeUnmount(() => {
   font-size: 13px;
   font-weight: 500;
   flex-shrink: 0;
+  /* Positioned so its z-index reliably wins over the fixed drawer (49). */
+  position: relative;
   z-index: 60;
   user-select: none;
 }
@@ -622,6 +638,8 @@ onBeforeUnmount(() => {
   padding: 0 6px 0 8px;
   background: #1a1a1a;
   border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  /* Positioned so its z-index reliably wins over the fixed drawer (49). */
+  position: relative;
   z-index: 50;
   user-select: none;
   color: #ffffff;
@@ -746,7 +764,8 @@ onBeforeUnmount(() => {
   position: fixed;
   inset: 0;
   background: rgba(0, 0, 0, 0.4);
-  z-index: 100;
+  /* 层级叠加：置于状态栏/顶栏之下，顶部栏不被遮罩盖住 */
+  z-index: 48;
   backdrop-filter: blur(2px);
 }
 
@@ -761,15 +780,28 @@ onBeforeUnmount(() => {
 
 .drawer-sidebar {
   position: fixed;
-  top: 0;
-  bottom: 0;
+  /* 顶部三段互不重叠（Android edge-to-edge 下 WebView 从 y=0 绘制）：
+       [0, safe-top)                 -> 系统状态栏，抽屉不进入
+       [safe-top, safe-top + 44px)  -> 应用顶栏，抽屉不进入
+       [safe-top + 44px, bottom)    -> 抽屉本体
+     所以抽屉从顶栏下沿开始，既避开系统状态栏，也不与顶栏叠压；
+     padding-top 归零，抽屉顶部不再有空白块。 */
+  top: calc(var(--safe-top, 40px) + 44px);
+  bottom: var(--safe-bottom, 0px);
   left: 0;
   width: 300px;
   max-width: 84vw;
   background: #1a1a1a;
-  z-index: 101;
+  /* 高于遮罩(48)、低于顶栏(50)：顶栏始终可见且可点击关闭抽屉 */
+  z-index: 49;
   display: flex;
   flex-direction: column;
+  /* 抽屉整体可下拉滚动，滚动不冒泡到页面 */
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  touch-action: pan-y;
   box-shadow: 2px 0 20px rgba(0, 0, 0, 0.4);
   transform: translateX(-100%);
   transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
@@ -834,6 +866,9 @@ onBeforeUnmount(() => {
   min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  touch-action: pan-y;
 }
 
 /* Main Viewport */
@@ -889,7 +924,8 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 12px;
+  /* 弹窗也避开系统状态栏 / 导航栏，避免顶部输入框被压住 */
+  padding: calc(var(--safe-top, 40px) + 12px) 12px calc(var(--safe-bottom, 0px) + 12px);
 }
 
 .search-modal-box {
@@ -914,7 +950,7 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 16px;
+  padding: calc(var(--safe-top, 40px) + 16px) 16px calc(var(--safe-bottom, 0px) + 16px);
 }
 .arn {
   background: #1a1a1a;
