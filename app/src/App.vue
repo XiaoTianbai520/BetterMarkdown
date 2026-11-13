@@ -477,12 +477,21 @@ onBeforeUnmount(() => {
 
 <style scoped>
 .mobile-app {
+  /* Android edge-to-edge (MainActivity.enableEdgeToEdge) draws the WebView
+     from y=0, i.e. *under* the system status bar. Reserve that height here so
+     the system status bar, the top bar and the drawer never overlap. env() is
+     the real inset on WebViews that report it; 32px is the fallback on those
+     that report 0. box-sizing:border-box keeps 100dvh from overflowing. */
+  --safe-top: max(env(safe-area-inset-top, 0px), 32px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
   width: 100vw;
   height: 100vh;
   height: 100dvh;
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  padding-top: var(--safe-top);
+  padding-bottom: var(--safe-bottom);
   background: var(--bg, #ffffff);
   color: var(--text, #111111);
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
@@ -500,6 +509,8 @@ onBeforeUnmount(() => {
   padding: 0 6px 0 8px;
   background: var(--bg-sidebar, var(--bg));
   border-bottom: var(--bd-hair, 1px solid rgba(0, 0, 0, 0.08));
+  /* Positioned so its z-index reliably wins over the fixed drawer (49). */
+  position: relative;
   z-index: 50;
   user-select: none;
 }
@@ -636,9 +647,10 @@ onBeforeUnmount(() => {
 
 .drawer-sidebar {
   position: fixed;
-  /* 铺满到屏幕顶部，不产生顶部空白块；靠 z-index 让顶栏压在其上 */
-  top: 0;
-  bottom: 0;
+  /* 与 .mobile-app 的内容区起点对齐（避开系统状态栏），不铺到 y=0；
+     顶栏 z-index 更高，仍会盖住抽屉上沿，不产生顶部空白块 */
+  top: var(--safe-top, 32px);
+  bottom: var(--safe-bottom, 0px);
   left: 0;
   width: 300px;
   max-width: 84vw;
@@ -767,7 +779,8 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 12px;
+  /* 弹窗也避开系统状态栏 / 导航栏，避免顶部输入框被压住 */
+  padding: calc(var(--safe-top, 32px) + 12px) 12px calc(var(--safe-bottom, 0px) + 12px);
 }
 
 .search-modal-box {
@@ -791,7 +804,7 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 16px;
+  padding: calc(var(--safe-top, 32px) + 16px) 16px calc(var(--safe-bottom, 0px) + 16px);
 }
 .arn {
   background: var(--bg, #fff);
