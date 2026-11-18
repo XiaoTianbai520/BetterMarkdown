@@ -240,11 +240,6 @@ pub fn fs_delete(path: String) -> Result<(), String> {
 }
 
 #[tauri::command]
-pub fn webview_runtime_version() -> Option<String> {
-    tauri::webview_version().ok()
-}
-
-#[tauri::command]
 pub fn fs_dir_exists(path: String) -> bool {
     Path::new(&path).is_dir()
 }
@@ -910,7 +905,7 @@ pub fn list_dir_with(path: String, show_hidden: bool, with_times: bool) -> Resul
     });
     if truncated {
         entries.push(DirEntry {
-            name: "__solomd_truncated__".into(),
+            name: "__zeromd_truncated__".into(),
             path: String::new(),
             is_dir: false,
             modified: None,
@@ -1154,71 +1149,6 @@ fn rebuild_block(layout: &BlockLayout) -> String {
         out.push_str(layout.body.trim_start_matches(['\n', '\r']));
     }
     out
-}
-
-pub fn set_frontmatter_property_str(
-    raw: &str,
-    key: &str,
-    value: &serde_json::Value,
-) -> Result<String, String> {
-    if key.trim().is_empty() {
-        return Err("frontmatter key must not be empty".into());
-    }
-    let mut layout = split_block(raw)?;
-    let entry = render_entry(key, value)?;
-    let spans = key_spans(&layout.inner_lines);
-
-    if let Some(span) = spans.iter().find(|s| s.key == key) {
-        layout
-            .inner_lines
-            .splice(span.start..span.end, entry.into_iter());
-    } else {
-        layout.inner_lines.extend(entry);
-    }
-    Ok(rebuild_block(&layout))
-}
-
-pub fn delete_frontmatter_property_str(raw: &str, key: &str) -> Result<String, String> {
-    let mut layout = split_block(raw)?;
-    let spans = key_spans(&layout.inner_lines);
-    if let Some(span) = spans.iter().find(|s| s.key == key) {
-        layout.inner_lines.drain(span.start..span.end);
-        if key_spans(&layout.inner_lines).is_empty() {
-            layout.inner_lines.clear();
-        }
-    }
-    Ok(rebuild_block(&layout))
-}
-
-#[tauri::command]
-pub async fn update_frontmatter_property(
-    path: String,
-    key: String,
-    value: serde_json::Value,
-) -> Result<String, String> {
-    tauri::async_runtime::spawn_blocking(move || {
-        let raw = fs::read_to_string(&path).map_err(|e| e.to_string())?;
-        let next = set_frontmatter_property_str(&raw, &key, &value)?;
-        fs::write(&path, &next).map_err(|e| e.to_string())?;
-        Ok(next)
-    })
-    .await
-    .map_err(|e| format!("join: {e}"))?
-}
-
-#[tauri::command]
-pub async fn delete_frontmatter_property(
-    path: String,
-    key: String,
-) -> Result<String, String> {
-    tauri::async_runtime::spawn_blocking(move || {
-        let raw = fs::read_to_string(&path).map_err(|e| e.to_string())?;
-        let next = delete_frontmatter_property_str(&raw, &key)?;
-        fs::write(&path, &next).map_err(|e| e.to_string())?;
-        Ok(next)
-    })
-    .await
-    .map_err(|e| format!("join: {e}"))?
 }
 
 #[cfg(test)]

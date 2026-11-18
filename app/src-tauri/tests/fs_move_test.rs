@@ -11,7 +11,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 fn tmp(name: &str) -> PathBuf {
-    let dir = std::env::temp_dir().join(format!("solomd-move-{name}"));
+    let dir = std::env::temp_dir().join(format!("zeromd-move-{name}"));
     let _ = fs::remove_dir_all(&dir);
     fs::create_dir_all(&dir).unwrap();
     dir

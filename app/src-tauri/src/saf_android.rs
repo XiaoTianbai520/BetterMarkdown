@@ -210,7 +210,11 @@ mod imp {
     use jni::objects::{JObject, JString, JValue};
     use jni::JavaVM;
 
-    const CLS: &str = "app/solomd/MainActivity";
+    // Must match `identifier` in tauri.conf.json + the generated Android
+    // project's package (gen/android/app/src/main/java/app/zeromd/MainActivity.kt).
+    // JNI resolves this class by name: a mismatch here makes every SAF invoke
+    // fail with NoClassDefFoundError.
+    const CLS: &str = "app/zeromd/MainActivity";
 
     fn with_env<T>(f: impl FnOnce(&mut jni::JNIEnv) -> Result<T, String>) -> Result<T, String> {
         let ctx = ndk_context::android_context();
@@ -273,9 +277,15 @@ mod imp {
 
     pub fn pick_folder() -> Result<(), String> {
         with_env(|env| {
-            env.call_static_method(CLS, "launchFolderPicker", "()V", &[])
-                .map_err(|e| e.to_string())?;
-            check_exc(env, "launchFolderPicker")
+            // Clear/collect a pending Java exception BEFORE the `?`: otherwise
+            // a NoClassDefFoundError (or any exception thrown by the Kotlin
+            // bridge) escapes into the WebView IPC handler and the frontend
+            // only sees "Error invoking postMessage: Java exception was raised
+            // during method invocation" instead of a usable error message.
+            let res = env.call_static_method(CLS, "launchFolderPicker", "()V", &[]);
+            check_exc(env, "launchFolderPicker")?;
+            res.map_err(|e| e.to_string())?;
+            Ok(())
         })
     }
 

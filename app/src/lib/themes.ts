@@ -144,7 +144,7 @@ export function themeFamily(theme: Theme): 'light' | 'dark' {
 }
 
 /**
- * Mermaid's built-in theme for a SoloMD theme: 'dark' for every dark theme
+ * Mermaid's built-in theme for a ZeroMD theme: 'dark' for every dark theme
  * (Nord, Dracula, Monokai, Solarized Dark…), not only the one named "dark".
  * Live edit, the Windows editor and preview all use this, so a diagram looks
  * the same in each (#354).

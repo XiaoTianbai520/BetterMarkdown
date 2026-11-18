@@ -8,28 +8,24 @@ import {
   onBeforeUnmount,
   provide,
 } from 'vue';
-import { invoke } from '@tauri-apps/api/core';
-
 // Stores & Composables
 import { useTabsStore } from './stores/tabs';
 import { useSettingsStore } from './stores/settings';
 import { useWorkspaceStore } from './stores/workspace';
 import { useFiles } from './composables/useFiles';
 import { useFileWatcher } from './composables/useFileWatcher';
-import { useShortcuts } from './composables/useShortcuts';
-import { useAutoCommit } from './composables/useAutoCommit';
 import { useI18n } from './i18n';
 import { baseNameOf, fileNameOf } from './lib/import-plan';
 import { dataThemeFor } from './lib/themes';
+import { isAndroid } from './lib/platform';
+import { isSafPath, safResolvePicked } from './lib/saf-fs';
 
 // Components
 import Editor from './components/Editor.vue';
 import Preview from './components/Preview.vue';
 import FileTree from './components/FileTree.vue';
-import AndroidFolderPicker from './components/AndroidFolderPicker.vue';
 import GlobalSearch from './components/GlobalSearch.vue';
 import SettingsPanel from './components/SettingsPanel.vue';
-import AboutDialog from './components/AboutDialog.vue';
 import KeyboardBar from './components/KeyboardBar.vue';
 import Toast from './components/Toast.vue';
 import UnsavedDialog from './components/UnsavedDialog.vue';
@@ -40,10 +36,7 @@ const tabs = useTabsStore();
 const settings = useSettingsStore();
 const workspace = useWorkspaceStore();
 const files = useFiles();
-const autoCommit = useAutoCommit();
 const { t } = useI18n();
-
-autoCommit.start();
 
 // Single document state
 const currentFile = computed(() => tabs.activeTab);
@@ -78,40 +71,34 @@ const drawerOpen = ref(false);
 // Modals state
 const searchOpen = ref(false);
 const settingsOpen = ref(false);
-const aboutOpen = ref(false);
 const moreMenuOpen = ref(false);
-const androidPickerOpen = ref(false);
-const androidRestartNeeded = ref(false);
 
+/**
+ * #148 — Android vaults MUST be SAF (content://) vaults. The old in-app
+ * folder browser returned a raw /storage/emulated/0/… path, which Android 11+
+ * scoped storage lets us *read* but not *write* — every new file failed with
+ * "create failed: Operation not permitted (os error 1)". useFiles.openFolder()
+ * launches the system ACTION_OPEN_DOCUMENT_TREE picker and routes all I/O via
+ * ContentResolver; the result is applied by resolveSafPick() on resume.
+ * Desktop/iOS keep their native dialogs through the same entry point.
+ */
 function openFolderPicker() {
-  androidPickerOpen.value = true;
+  void files.openFolder();
 }
 
-function onAndroidFolderPick(path: string) {
-  androidPickerOpen.value = false;
-  workspace.setFolder(path);
-  drawerOpen.value = true;
+// Save (the top bar button and the More menu share one path)
+async function saveNow() {
+  await files.saveActive();
 }
 
-async function requestAndroidStorage() {
-  const toasts = (await import('./stores/toasts')).useToastsStore();
-  try {
-    localStorage.setItem('solomd:android-storage-pending', '1');
-    await invoke('android_request_all_files_access');
-    toasts.info(t('toast.androidAllFilesReturn') || '请在系统设置中允许所有文件访问权限');
-  } catch (e) {
-    toasts.error(String(e));
-  }
+async function saveAndCloseMenu() {
+  moreMenuOpen.value = false;
+  await files.saveActive();
 }
 
-async function doAndroidRestart() {
-  androidRestartNeeded.value = false;
-  try {
-    await invoke('android_restart_app');
-  } catch (e) {
-    const toasts = (await import('./stores/toasts')).useToastsStore();
-    toasts.error(String(e));
-  }
+async function saveAsAndCloseMenu() {
+  moreMenuOpen.value = false;
+  await files.saveActiveAs();
 }
 
 // New note
@@ -177,12 +164,6 @@ function onFileChangedAction(action: 'reload' | 'overwrite' | 'cancel') {
 
 useFileWatcher(showFileChangedDialog);
 
-// Hardware keyboard shortcuts (optional helper)
-useShortcuts({
-  openSettings: () => (settingsOpen.value = true),
-  openGlobalSearch: () => (searchOpen.value = true),
-});
-
 // Editor events
 const cursorLine = ref(1);
 const cursorCol = ref(1);
@@ -218,7 +199,7 @@ watch(
 watchEffect(() => {
   document.documentElement.setAttribute(
     'data-theme',
-    dataThemeFor(settings.theme, !!settings.customCssPath),
+    dataThemeFor(settings.theme),
   );
 });
 watchEffect(() => {
@@ -239,35 +220,90 @@ function onWindowBlur() {
   void files.autoSaveDirtyTabs();
 }
 
+/** Old builds stored raw shared-storage paths as vaults; they are read-only
+ *  under Android 11+ scoped storage. SAF vaults are `saf:<documentId>`. The
+ *  app-private external dir (/Android/data/…) is still writable and excluded. */
+function isLegacyAndroidVault(path: string): boolean {
+  return (
+    !isSafPath(path) &&
+    path.startsWith('/storage/emulated/0/') &&
+    !path.includes('/Android/data/')
+  );
+}
+
+/**
+ * #148 — the SAF folder picker is a separate Activity that backgrounds our
+ * WebView, so the result (delivered to MainActivity.onActivityResult) can't be
+ * awaited inline. useFiles.openFolder() sets `zeromd:saf-picking` before
+ * launching it; drain the native result on resume and install the vault.
+ */
+async function resolveSafPick() {
+  if (localStorage.getItem('zeromd:saf-picking') !== '1') return;
+  for (let i = 0; i < 12; i++) {
+    let picked: Awaited<ReturnType<typeof safResolvePicked>>;
+    try {
+      picked = await safResolvePicked();
+    } catch {
+      return; // leave the flag so the next resume retries
+    }
+    if (picked === 'pending') {
+      await new Promise((res) => setTimeout(res, 300));
+      continue;
+    }
+    localStorage.removeItem('zeromd:saf-picking');
+    if (picked) {
+      workspace.setSafVault(picked.treeUri, `saf:${picked.rootDocId}`, picked.name);
+      drawerOpen.value = true;
+    }
+    return;
+  }
+  // Still pending after the retry window — keep the flag for the next resume.
+}
+
+function onVisibilityChange() {
+  if (document.visibilityState === 'visible') void resolveSafPick();
+}
+
 onMounted(async () => {
   // If no note is open, create a default Untitled note
   if (tabs.tabs.length === 0) {
     tabs.newTab({ fileName: 'Untitled.md', language: 'markdown' });
   }
 
-  // Check Android storage access resumption
-  if (localStorage.getItem('solomd:android-storage-pending')) {
-    try {
-      const hasPerm = await invoke<boolean>('android_check_all_files_access');
-      if (hasPerm) {
-        localStorage.removeItem('solomd:android-storage-pending');
-        androidRestartNeeded.value = true;
-      }
-    } catch {}
+  // Legacy vaults (raw shared-storage paths) are read-only under scoped
+  // storage: listing succeeds, creating a file fails with EPERM/os error 1.
+  // Drop them so the user re-picks the folder through SAF; the app-private
+  // external dir (/Android/data/…) stays valid and is left alone.
+  if (isAndroid()) {
+    const stale = workspace.recentFolders.filter(isLegacyAndroidVault);
+    for (const path of stale) workspace.removeRecentFolder(path);
+    if (workspace.currentFolder && isLegacyAndroidVault(workspace.currentFolder)) {
+      workspace.setFolder(null);
+      const toasts = (await import('./stores/toasts')).useToastsStore();
+      toasts.info('请用「切换库」重新授权目录（系统文件夹选择器）');
+    }
   }
 
-  window.addEventListener('solomd:file-opened', onFileOpened);
+  // The old MANAGE_EXTERNAL_STORAGE round-trip is gone (SAF needs no
+  // permission). Clear its stale in-flight flag so it can never surface the
+  // obsolete "restart the app" banner after an upgrade.
+  localStorage.removeItem('zeromd:android-storage-pending');
+
+  document.addEventListener('visibilitychange', onVisibilityChange);
+  void resolveSafPick();
+  window.addEventListener('zeromd:file-opened', onFileOpened);
   window.addEventListener('blur', onWindowBlur);
 });
 
 onBeforeUnmount(() => {
-  window.removeEventListener('solomd:file-opened', onFileOpened);
+  document.removeEventListener('visibilitychange', onVisibilityChange);
+  window.removeEventListener('zeromd:file-opened', onFileOpened);
   window.removeEventListener('blur', onWindowBlur);
 });
 </script>
 
 <template>
-  <div class="mobile-app" :data-theme="dataThemeFor(settings.theme, !!settings.customCssPath)">
+  <div class="mobile-app" :data-theme="dataThemeFor(settings.theme)">
     <!-- 1. Mobile Top Bar -->
     <header class="mobile-topbar">
       <div class="mobile-topbar__left">
@@ -307,6 +343,17 @@ onBeforeUnmount(() => {
           <Icons name="search" :size="20" />
         </button>
 
+        <!-- Save -->
+        <button
+          class="topbar-btn"
+          :class="{ 'topbar-btn--active': isDirty }"
+          :title="isDirty ? '保存（自动保存已开启）' : '已保存'"
+          :disabled="!isDirty"
+          @click="saveNow"
+        >
+          <Icons name="save" :size="20" />
+        </button>
+
         <!-- New Note -->
         <button
           class="topbar-btn"
@@ -333,6 +380,14 @@ onBeforeUnmount(() => {
             @click="moreMenuOpen = false"
           />
           <div v-if="moreMenuOpen" class="more-menu-dropdown">
+            <button class="more-menu-item" @click="saveAndCloseMenu">
+              <Icons name="save" :size="18" />
+              <span>{{ isDirty ? '保存' : '已保存' }}</span>
+            </button>
+            <button class="more-menu-item" @click="saveAsAndCloseMenu">
+              <Icons name="save-as" :size="18" />
+              <span>另存为…</span>
+            </button>
             <button class="more-menu-item" @click="openFolderPicker(); moreMenuOpen = false">
               <Icons name="folder" :size="18" />
               <span>打开目录库</span>
@@ -340,10 +395,6 @@ onBeforeUnmount(() => {
             <button class="more-menu-item" @click="settingsOpen = true; moreMenuOpen = false">
               <Icons name="settings" :size="18" />
               <span>设置</span>
-            </button>
-            <button class="more-menu-item" @click="aboutOpen = true; moreMenuOpen = false">
-              <Icons name="info" :size="18" />
-              <span>关于</span>
             </button>
           </div>
         </div>
@@ -420,22 +471,9 @@ onBeforeUnmount(() => {
       </div>
     </div>
 
-    <AndroidFolderPicker
-      :open="androidPickerOpen"
-      :start="workspace.currentFolder ?? undefined"
-      @pick="onAndroidFolderPick"
-      @close="androidPickerOpen = false"
-      @request-permission="androidPickerOpen = false; requestAndroidStorage()"
-    />
-
     <SettingsPanel
       :open="settingsOpen"
       @close="settingsOpen = false"
-    />
-
-    <AboutDialog
-      :open="aboutOpen"
-      @close="aboutOpen = false"
     />
 
     <Toast />
@@ -458,20 +496,6 @@ onBeforeUnmount(() => {
       @cancel="onFileChangedAction('cancel')"
     />
 
-    <!-- Android Storage Permission Restart Notice -->
-    <div v-if="androidRestartNeeded" class="arn-backdrop">
-      <div class="arn">
-        <div class="arn__title">重启一次即可读取文件夹</div>
-        <p class="arn__body">
-          文件访问权限已开启 ✅。安卓要求 App 重启后才能真正读取手机存储。<br /><br />
-          点「关闭 SoloMD」→ 从后台任务里划掉 → 重新打开 App，再点「打开目录库」就能选你的笔记文件夹了。
-        </p>
-        <div class="arn__foot">
-          <button class="arn__btn" @click="androidRestartNeeded = false">稍后</button>
-          <button class="arn__btn arn__btn--primary" @click="doAndroidRestart">关闭 SoloMD</button>
-        </div>
-      </div>
-    </div>
   </div>
 </template>
 
@@ -577,6 +601,11 @@ onBeforeUnmount(() => {
 .topbar-btn--active {
   background: var(--accent-soft, rgba(255, 159, 64, 0.15));
   color: var(--accent-text, #ff9f40);
+}
+
+.topbar-btn:disabled {
+  opacity: 0.3;
+  pointer-events: none;
 }
 
 /* More Menu */
@@ -795,55 +824,4 @@ onBeforeUnmount(() => {
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
 }
 
-/* Android restart prompt */
-.arn-backdrop {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.5);
-  z-index: 2000;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: calc(var(--safe-top, 32px) + 16px) 16px calc(var(--safe-bottom, 0px) + 16px);
-}
-.arn {
-  background: var(--bg, #fff);
-  color: var(--text, #111);
-  border-radius: var(--r-lg, 12px);
-  width: 100%;
-  max-width: 380px;
-  padding: 20px;
-  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.2);
-}
-.arn__title {
-  font-size: 16px;
-  font-weight: 600;
-  margin-bottom: 12px;
-}
-.arn__body {
-  font-size: 14px;
-  line-height: 1.6;
-  color: var(--text-2, #555);
-  margin: 0 0 16px;
-}
-.arn__foot {
-  display: flex;
-  justify-content: flex-end;
-  gap: 8px;
-}
-.arn__btn {
-  height: 36px;
-  padding: 0 14px;
-  border-radius: var(--r-md, 6px);
-  border: 1px solid var(--border, rgba(0, 0, 0, 0.15));
-  background: transparent;
-  color: var(--text, #111);
-  font-size: 13px;
-  cursor: pointer;
-}
-.arn__btn--primary {
-  background: var(--accent, #ff9f40);
-  border-color: var(--accent, #ff9f40);
-  color: var(--accent-fg, #fff);
-}
 </style>

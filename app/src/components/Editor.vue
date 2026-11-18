@@ -71,12 +71,10 @@ import {
   prevParagraphStart,
   selectionEnds,
 } from '../lib/plain-nav';
-import { IS_APP_STORE_BUILD } from '../lib/app-build';
 import { slashCommandsExtension } from '../lib/cm-slash-commands';
 import { useI18n } from '../i18n';
 import { spellcheckExtension } from '../lib/cm-spellcheck';
 import { spellcheckTheme } from '../lib/cm-spellcheck-theme';
-import { usePandocExport } from '../composables/usePandocExport';
 import { taskListExtension } from '../lib/cm-task-list';
 import { imeCompositionGuard } from '../lib/cm-ime-guard';
 import {
@@ -87,7 +85,6 @@ import {
 import { renderMarkdown, extractImageRoot as extractMarkdownImageRoot } from '../lib/markdown';
 import { useRenderDepsVersion } from '../composables/useRenderDepsVersion';
 import { attachCodeCopyButtons } from '../lib/code-copy';
-import { plantumlSvgUrl } from '../lib/plantuml';
 import { stableClickSelection } from '../lib/cm-stable-click';
 import { cjkDoubleClickSelection } from '../lib/cm-cjk-dblclick';
 import { installSvgImageFallbacks, rewriteImageUrls } from '../lib/image-resolve';
@@ -215,17 +212,6 @@ function imagePasteOpts(): ImagePasteOptions {
     },
   };
 }
-const pandoc = usePandocExport();
-let cachedCitations: any[] = [];
-pandoc.loadCitations().then((c) => { cachedCitations = c; }).catch(() => {});
-watch(
-  () => settings.workspaceBibliography,
-  () => {
-    pandoc.invalidateCitationsCache();
-    pandoc.loadCitations().then((c) => { cachedCitations = c; }).catch(() => {});
-  },
-);
-
 const host = ref<HTMLDivElement | null>(null);
 let view: EditorView | null = null;
 let cleanupRelayout: (() => void) | null = null;
@@ -302,7 +288,7 @@ const foldCompartment = new Compartment();
 // #222 — Vim's `:w` / `:wq` / `:q` were dead: @replit/codemirror-vim ships no
 // Ex-command handlers (there is no file system in the browser), so typing `:w`
 // just cleared the command line without saving. Route them through the same
-// `solomd:menu-action` bus the menu bar and Ctrl+S use, so save / save-and-close
+// `zeromd:menu-action` bus the menu bar and Ctrl+S use, so save / save-and-close
 // / close honour the app's real save + unsaved-tab flow. Registered once on the
 // global Vim singleton (idempotent guard — defineEx would otherwise stack).
 
@@ -352,7 +338,7 @@ function noteTypedInTextarea(el: HTMLTextAreaElement, event: Event) {
 }
 
 // Synchronous counterpart to the debounce below. `saveTab` broadcasts
-// `solomd:flush-content-sync` right before reading `tab.content`, because a
+// `zeromd:flush-content-sync` right before reading `tab.content`, because a
 // save landing inside the 350ms window would otherwise write a stale document
 // — fatal for vim's `:wq` (#222), which closes the tab immediately after the
 // save and silently drops the not-yet-synced tail of the edit. While an IME
@@ -709,31 +695,6 @@ async function processPlainLiveRenderedBlocks() {
   installSvgImageFallbacks(hostEl);
 
   // v4.10 #163 — PlantUML fences (opt-in), same <img> swap as the preview pane.
-  if (settings.plantumlEnabled && settings.plantumlServer) {
-    const pumlBlocks = hostEl.querySelectorAll(
-      '.plain-block__render pre > code.language-plantuml, .plain-block__render pre > code.language-puml',
-    );
-    for (const block of Array.from(pumlBlocks)) {
-      const pre = block.parentElement as HTMLElement | null;
-      if (!pre || pre.dataset.rendered === '1') continue;
-      pre.dataset.rendered = '1';
-      const code = (block.textContent || '').trim();
-      const wrap = document.createElement('div');
-      wrap.className = 'plain-plantuml-block';
-      const img = document.createElement('img');
-      img.alt = 'PlantUML diagram';
-      img.src = plantumlSvgUrl(settings.plantumlServer, code);
-      img.addEventListener('error', () => {
-        wrap.classList.add('plain-block__broken');
-        wrap.textContent = `PlantUML render failed (${settings.plantumlServer})`;
-      });
-      wrap.appendChild(img);
-      pre.replaceWith(wrap);
-    }
-  }
-
-  
-
   attachPlainCodeCopyButtons(hostEl);
 }
 
@@ -2006,11 +1967,7 @@ function buildAcItems(kind: AcKind, query: string): AcItem[] {
       cursorOffset: lang.name.length,
     }));
   }
-  // citation
-  return cachedCitations
-    .filter((c) => (c.key || '').toLowerCase().includes(q))
-    .slice(0, 8)
-    .map((c) => ({ label: `@${c.key}`, hint: (c.title ? String(c.title).slice(0, 32) : ''), insert: `@${c.key} `, cursorOffset: c.key.length + 2 }));
+  return [];
 }
 
 function caretRectFromHighlight(caret: number): { left: number; bottom: number } | null {
@@ -2263,20 +2220,6 @@ function handlePlainKeydownShared(event: KeyboardEvent): boolean {
     event.preventDefault();
     runPlainSelectAll();
     return true;
-  }
-  // Ctrl/Cmd+J — AI rewrite of the selection (matches cm-ai-rewrite). The
-  // overlay + accept path are shared with the CodeMirror editor; accept replaces
-  // the (retained) selection via the insert-markdown channel.
-  if (!IS_APP_STORE_BUILD && mod && !event.altKey && letter === 'j') {
-    const sel = plainAbsoluteSelection();
-    const text = plainSelectionText();
-    if (sel && text) {
-      event.preventDefault();
-      window.dispatchEvent(
-        new CustomEvent('solomd:ai-rewrite-open', { detail: { selection: text, from: sel.from, to: sel.to } }),
-      );
-      return true;
-    }
   }
   return false;
 }
@@ -3535,7 +3478,7 @@ function onEditorMenuResizeImage(size: string) {
   if (!usePlainWindowsEditor) {
     const v = view;
     if (!v) return;
-    let lineNum = Number.parseInt(img.dataset.solomdLine || '', 10);
+    let lineNum = Number.parseInt(img.dataset.zeromdLine || '', 10);
     if (!Number.isFinite(lineNum) || lineNum < 1 || lineNum > v.state.doc.lines) {
       try {
         const pos = v.posAtDOM(img);
@@ -4057,7 +4000,7 @@ function buildExtensions() {
     richCompartment.of(
       windowsImeSafeMode ? [] : richExtensionsFor(props.tab),
     ),
-    themeCompartment.of(cmThemeFor(settings.theme, !!settings.customCssPath)),
+    themeCompartment.of(cmThemeFor(settings.theme)),
     vimCompartment.of(settings.vimMode ? vimExtension() : []),
     fontSizeCompartment.of(fontSizeTheme(settings.fontSize, settings.fontFamily)),
     spellCheckCompartment.of(spellCheckExt(props.spellCheck)),
@@ -4170,17 +4113,17 @@ onMounted(() => {
   // to exist on ALL three editor paths, and the CodeMirror-only setup that
   // follows is unreachable on Windows. (Putting it further down is what made
   // the first attempt silently no-op on the plain editors.)
-  window.addEventListener('solomd:transform-case', onTransformCase as EventListener);
-  window.addEventListener('solomd:format-markdown', onFormatMarkdown as EventListener);
-  window.addEventListener('solomd:editor-command', onEditorCommand as EventListener);
-  window.addEventListener('solomd:editor-history', onEditorHistory as EventListener);
+  window.addEventListener('zeromd:transform-case', onTransformCase as EventListener);
+  window.addEventListener('zeromd:format-markdown', onFormatMarkdown as EventListener);
+  window.addEventListener('zeromd:editor-command', onEditorCommand as EventListener);
+  window.addEventListener('zeromd:editor-history', onEditorHistory as EventListener);
   window.addEventListener('keydown', onPlainWindowKeydown);
     cleanupTransformCase = () => {
         window.removeEventListener('keydown', onPlainWindowKeydown);
-    window.removeEventListener('solomd:editor-history', onEditorHistory as EventListener);
-    window.removeEventListener('solomd:transform-case', onTransformCase as EventListener);
-    window.removeEventListener('solomd:format-markdown', onFormatMarkdown as EventListener);
-    window.removeEventListener('solomd:editor-command', onEditorCommand as EventListener);
+    window.removeEventListener('zeromd:editor-history', onEditorHistory as EventListener);
+    window.removeEventListener('zeromd:transform-case', onTransformCase as EventListener);
+    window.removeEventListener('zeromd:format-markdown', onFormatMarkdown as EventListener);
+    window.removeEventListener('zeromd:editor-command', onEditorCommand as EventListener);
   };
 
   if (usePlainWindowsEditor) {
@@ -4248,15 +4191,15 @@ onMounted(() => {
   // harnesses. Vite injects `import.meta.env.DEV === true` only in dev
   // builds; production bundles dead-code-eliminate this entire block.
   if (import.meta.env.DEV) {
-    (window as unknown as { __solomdActiveView?: EditorView }).__solomdActiveView = view;
+    (window as unknown as { __zeromdActiveView?: EditorView }).__zeromdActiveView = view;
   }
   // Right-sidebar pane visibility / splitter drags change the available
   // editor width, but CodeMirror's ResizeObserver may lag for a frame.
   // Listen for an explicit relayout event and force a re-measure. Used
   // by the search pane toggle (PR #50) and the rs-pane-host stack.
   const onRelayout = () => view?.requestMeasure();
-  window.addEventListener('solomd:relayout', onRelayout);
-  window.addEventListener('solomd:flush-content-sync', flushContentSync);
+  window.addEventListener('zeromd:relayout', onRelayout);
+  window.addEventListener('zeromd:flush-content-sync', flushContentSync);
   if (window.visualViewport) {
     window.visualViewport.addEventListener('resize', scrollCursorIntoVisualView);
     window.visualViewport.addEventListener('scroll', scrollCursorIntoVisualView);
@@ -4266,8 +4209,8 @@ onMounted(() => {
       window.visualViewport.removeEventListener('resize', scrollCursorIntoVisualView);
       window.visualViewport.removeEventListener('scroll', scrollCursorIntoVisualView);
     }
-    window.removeEventListener('solomd:relayout', onRelayout);
-    window.removeEventListener('solomd:flush-content-sync', flushContentSync);
+    window.removeEventListener('zeromd:relayout', onRelayout);
+    window.removeEventListener('zeromd:flush-content-sync', flushContentSync);
   };
 });
 
@@ -4619,7 +4562,7 @@ function onEditorCommand(e: Event) {
  * #137 — open the find/replace UI. The panel already exists on both editor
  * paths (CodeMirror's search panel + the plain-textarea find bar) behind
  * Ctrl+F, but had no toolbar / command-palette entry, so users thought it was
- * gone. PaneContent forwards `solomd:editor-find` here for the focused pane.
+ * gone. PaneContent forwards `zeromd:editor-find` here for the focused pane.
  */
 function findPanelLabels(): FindPanelLabels {
   return {
@@ -4805,8 +4748,8 @@ onBeforeUnmount(() => {
     }
   }
   if (import.meta.env.DEV) {
-    const w = window as unknown as { __solomdActiveView?: EditorView };
-    if (w.__solomdActiveView === view) delete w.__solomdActiveView;
+    const w = window as unknown as { __zeromdActiveView?: EditorView };
+    if (w.__zeromdActiveView === view) delete w.__zeromdActiveView;
   }
   view?.destroy();
   view = null;
@@ -5058,12 +5001,12 @@ watch(
 );
 
 watch(
-  () => [settings.theme, !!settings.customCssPath] as const,
-  ([t, custom]) => {
-    view?.dispatch({ effects: themeCompartment.reconfigure(cmThemeFor(t, custom)) });
+  () => [settings.theme] as const,
+  ([t]) => {
+    view?.dispatch({ effects: themeCompartment.reconfigure(cmThemeFor(t)) });
     // Live-edit Mermaid widgets carry their theme; rebuild the block field so
     // diagrams on screen re-render for the new light/dark family (#354).
-    window.dispatchEvent(new CustomEvent('solomd:cm-relayout'));
+    window.dispatchEvent(new CustomEvent('zeromd:cm-relayout'));
   }
 );
 
@@ -5129,7 +5072,7 @@ watch(
   [() => settings.plantumlEnabled, () => settings.plantumlServer],
   () => {
     try {
-      window.dispatchEvent(new CustomEvent('solomd:cm-relayout'));
+      window.dispatchEvent(new CustomEvent('zeromd:cm-relayout'));
     } catch {}
   }
 );

@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "ZeroMD",
-  "version": "1.0.0",
+  "version": "5.0.11",
   "identifier": "app.zeromd",
   "build": {
     "beforeDevCommand": "pnpm dev",

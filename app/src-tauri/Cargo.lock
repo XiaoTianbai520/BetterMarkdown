@@ -3476,30 +3476,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "solomd"
-version = "5.0.9"
-dependencies = [
- "chardetng",
- "encoding_rs",
- "jni",
- "ndk-context",
- "notify",
- "notify-debouncer-mini",
- "serde",
- "serde_json",
- "tauri",
- "tauri-build",
- "tauri-plugin-clipboard-manager",
- "tauri-plugin-deep-link",
- "tauri-plugin-dialog",
- "tauri-plugin-fs",
- "tauri-plugin-opener",
- "tempfile",
- "tokio",
- "walkdir",
-]
-
-[[package]]
 name = "soup3"
 version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5636,6 +5612,30 @@ dependencies = [
  "quote",
  "syn 2.0.117",
  "synstructure",
+]
+
+[[package]]
+name = "zeromd"
+version = "1.0.0"
+dependencies = [
+ "chardetng",
+ "encoding_rs",
+ "jni",
+ "ndk-context",
+ "notify",
+ "notify-debouncer-mini",
+ "serde",
+ "serde_json",
+ "tauri",
+ "tauri-build",
+ "tauri-plugin-clipboard-manager",
+ "tauri-plugin-deep-link",
+ "tauri-plugin-dialog",
+ "tauri-plugin-fs",
+ "tauri-plugin-opener",
+ "tempfile",
+ "tokio",
+ "walkdir",
 ]
 
 [[package]]

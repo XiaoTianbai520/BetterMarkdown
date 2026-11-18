@@ -3,7 +3,7 @@
  * 5.0 selection bubble (docs/v5-ui-spec.md §5) — the floating format bar over
  * a text selection, as in Apple's own text-formatting popovers.
  *
- * Editor-agnostic on purpose: SoloMD has two editors on Windows (CodeMirror
+ * Editor-agnostic on purpose: ZeroMD has two editors on Windows (CodeMirror
  * and the native textarea one), and a feature written against one of them is
  * silently dead in the other. Editor.vue hands this component two readers —
  * `read` (the selection, as text) and `rect` (where it is on screen) — for
@@ -327,7 +327,7 @@ function aiRewrite() {
   hide();
   // Toolbar.vue owns AI rewrite (reads the selection from either editor and
   // opens the overlay); this is the same event the menu bar uses.
-  window.dispatchEvent(new CustomEvent('solomd:toolbar-ai-rewrite'));
+  window.dispatchEvent(new CustomEvent('zeromd:toolbar-ai-rewrite'));
 }
 
 const style = computed(() =>

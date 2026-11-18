@@ -166,7 +166,7 @@ const showInboxOnly = computed(() => inbox.filterMode.value);
 /** Sentinel emitted by the Rust backend when it truncated a huge dir
  * past the 10,000-entry hard cap. We surface it as a dedicated UI
  * row instead of rendering it as a fake file. */
-const TRUNCATED_SENTINEL = '__solomd_truncated__';
+const TRUNCATED_SENTINEL = '__zeromd_truncated__';
 
 /** True when the workspace folder itself is gone (moved, deleted, unmounted
  *  drive). Distinct from "empty": an empty tree under the folder's own name is
@@ -194,7 +194,7 @@ function hiddenInTree(e: { name: string; is_dir: boolean }): boolean {
 
 // ---------------------------------------------------------------------------
 // #342 — sort order. One mode per workspace (settings.explorerSortByFolder);
-// "manual" keeps a per-folder name list in <vault>/.solomd/order.json, which
+// "manual" keeps a per-folder name list in <vault>/.zeromd/order.json, which
 // is written only once the user actually drags something into place — the
 // file is not created just by opening a vault (see #236).
 // ---------------------------------------------------------------------------
@@ -211,7 +211,7 @@ function orderKey(folder: string): string {
 function orderPath(): string | null {
   const rootPath = workspace.currentFolder;
   if (!rootPath || isSafPath(rootPath)) return null;
-  return joinPath(joinPath(rootPath, '.solomd'), 'order.json');
+  return joinPath(joinPath(rootPath, '.zeromd'), 'order.json');
 }
 async function loadManualOrder() {
   manualOrder.value = {};
@@ -660,21 +660,21 @@ function onBeforeUnload() {
 }
 
 onMounted(async () => {
-  window.addEventListener('solomd:saved', onSaved as EventListener);
-  window.addEventListener('solomd:remote-pulled', onRemotePulled as EventListener);
+  window.addEventListener('zeromd:saved', onSaved as EventListener);
+  window.addEventListener('zeromd:remote-pulled', onRemotePulled as EventListener);
   window.addEventListener('beforeunload', onBeforeUnload);
   try {
-    unlistenIndex = await listen('solomd://index-updated', () => scheduleRefresh());
+    unlistenIndex = await listen('zeromd://index-updated', () => scheduleRefresh());
   } catch {}
   try {
     // A quick capture writes straight to disk from Rust; without this the new
     // Inbox note is invisible until something else happens to refresh.
-    unlistenCapture = await listen('solomd://capture-written', () => scheduleRefresh());
+    unlistenCapture = await listen('zeromd://capture-written', () => scheduleRefresh());
   } catch {}
 });
 onBeforeUnmount(() => {
-  window.removeEventListener('solomd:saved', onSaved as EventListener);
-  window.removeEventListener('solomd:remote-pulled', onRemotePulled as EventListener);
+  window.removeEventListener('zeromd:saved', onSaved as EventListener);
+  window.removeEventListener('zeromd:remote-pulled', onRemotePulled as EventListener);
   window.removeEventListener('beforeunload', onBeforeUnload);
   // Hiding the tree unmounts it; a selection left behind would keep aiming
   // "new file" at a folder the user can no longer see.
@@ -965,11 +965,11 @@ function rootRelative(p: string): string {
 
 /** The folder's name in the header. On iOS the app's own container folder is
  *  ".../Data/Application/<uuid>/Documents", which the Files app shows as
- *  "On My iPhone › SoloMD" — say SoloMD here too, not "Documents". */
+ *  "On My iPhone › ZeroMD" — say ZeroMD here too, not "Documents". */
 const rootDisplayName = computed(() => {
   const r = root.value;
   if (!r) return '';
-  if (isIOS() && /\/Data\/Application\/[^/]+\/Documents\/?$/.test(r.path)) return 'SoloMD';
+  if (isIOS() && /\/Data\/Application\/[^/]+\/Documents\/?$/.test(r.path)) return 'ZeroMD';
   return r.name;
 });
 
@@ -1417,8 +1417,8 @@ function placeGhost(x: number, y: number) {
  *  over every row, button and scrollbar for the length of the drag. */
 function setDragCursor(state: 'grab' | 'invalid' | null) {
   const cl = document.documentElement.classList;
-  cl.toggle('solomd-tree-dragging', state !== null);
-  cl.toggle('solomd-tree-drag-invalid', state === 'invalid');
+  cl.toggle('zeromd-tree-dragging', state !== null);
+  cl.toggle('zeromd-tree-drag-invalid', state === 'invalid');
 }
 
 function onDragKey(e: KeyboardEvent) {
@@ -3265,12 +3265,12 @@ export const FileTreeNode = defineComponent({
 /* #361 — drag feedback that must live outside the scoped block: the ghost is
    teleported to <body>, and the cursor override has to beat the rows' own
    `cursor: pointer` on every element for the length of the drag. */
-html.solomd-tree-dragging,
-html.solomd-tree-dragging * {
+html.zeromd-tree-dragging,
+html.zeromd-tree-dragging * {
   cursor: grabbing !important;
 }
-html.solomd-tree-drag-invalid,
-html.solomd-tree-drag-invalid * {
+html.zeromd-tree-drag-invalid,
+html.zeromd-tree-drag-invalid * {
   cursor: not-allowed !important;
 }
 .ftree-ghost {

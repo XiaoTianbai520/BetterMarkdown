@@ -3,12 +3,12 @@ import type { I18n } from './en';
 export const zh: I18n = {
   // Windows 统一标题栏 — 应用内 文件/编辑/视图/帮助 菜单栏(Toolbar.vue)。
   iosFolder: {
-    pickerUnavailable: '无法打开文件夹选择器，已改用 SoloMD 自己的文件夹（「文件」App › 我的 iPhone › SoloMD）。',
+    pickerUnavailable: '无法打开文件夹选择器，已改用 ZeroMD 自己的文件夹（「文件」App › 我的 iPhone › ZeroMD）。',
     savedAs: '已另存为 {name}',
-    restoreFailed: '无法重新打开上次选择的文件夹，已显示 SoloMD 自己的文件夹。可以用「打开文件夹」重新选择。',
+    restoreFailed: '无法重新打开上次选择的文件夹，已显示 ZeroMD 自己的文件夹。可以用「打开文件夹」重新选择。',
   },
   starPrompt: {
-    message: '觉得 SoloMD 好用？去 GitHub 点个 Star 吧——它由一个人开发、免费开源，Star 能让更多人发现它。',
+    message: '觉得 ZeroMD 好用？去 GitHub 点个 Star 吧——它由一个人开发、免费开源，Star 能让更多人发现它。',
     action: '★ 去点 Star',
   },
   menubar: {
@@ -87,10 +87,10 @@ export const zh: I18n = {
     theme: "主题风格",
     checkUpdate: "检查更新…",
     services: "服务",
-    hide: "隐藏 SoloMD",
+    hide: "隐藏 ZeroMD",
     hideOthers: "隐藏其他",
     showAll: "全部显示",
-    quit: "退出 SoloMD",
+    quit: "退出 ZeroMD",
     window: "窗口",
     quickCapture: "快速记录…",
     daily: "日记",
@@ -425,7 +425,7 @@ export const zh: I18n = {
     catAdvanced: '高级',
     catKeys: '快捷键',
     keysInterceptedTitle: "有快捷键被别的软件抢走了",
-    keysInterceptedBody: "下面这些组合被列出的程序注册成了全局热键,按下去根本到不了 SoloMD。把这些命令改到右侧的键位即可,其余快捷键不受影响。",
+    keysInterceptedBody: "下面这些组合被列出的程序注册成了全局热键,按下去根本到不了 ZeroMD。把这些命令改到右侧的键位即可,其余快捷键不受影响。",
     keysApplyCompat: "把这些命令改到不冲突的键位",
     keysCompatApplied: "已改绑 {count} 个快捷键,想还原用「全部重置」。",
     keysSearch: "搜索快捷键 —— 输入名称或按键…",
@@ -584,8 +584,6 @@ export const zh: I18n = {
       codeThemeDark: '始终深色',
       frontmatterHint: '可在每个文档的 YAML front matter 中以 `pdf:` 块覆盖（pageSize / margin / font / fontSize / footer / toc）。',
     },
-    imageExportBranding: '导出图片时附加 "Created with SoloMD" 水印',
-    imageExportBrandingHint: '默认开启 —— 在分享截图上做点温和宣传。如果不希望有水印可以关掉，关掉后短笔记导出也会更紧凑（不再有那段尾部留白）。',
     attachmentMode: '粘贴 / 拖入图片的保存位置',
     attachmentModeShared: '共享 `_assets/` 目录（每个文件夹一个）',
     attachmentModePerFile: '每篇笔记独立的 `<笔记名>.assets/` 目录',
@@ -628,7 +626,7 @@ export const zh: I18n = {
     fileAssoc: '文件关联',
     setDefault: '⭐ 设为默认 Markdown 编辑器',
     settingDefault: '设置中…',
-    setDefaultHint: '将 SoloMD 注册为 .md / .markdown / .mdown / .mkd 文件的默认打开方式。Windows 还会加入右键"打开方式"菜单。Linux 需要 xdg-utils。',
+    setDefaultHint: '将 ZeroMD 注册为 .md / .markdown / .mdown / .mkd 文件的默认打开方式。Windows 还会加入右键"打开方式"菜单。Linux 需要 xdg-utils。',
     language: '语言 / Language',
     restoreSession: '启动时恢复上次的标签页和分屏',
     restoreSessionHint: '关闭后，每次启动都是空白，不会自动打开之前的文档。',
@@ -640,7 +638,7 @@ export const zh: I18n = {
 
     autoReloadExternalChanges: '自动刷新被外部修改的文件',
 
-    autoReloadExternalChangesHint: '默认开启：当其他程序（其他编辑器、git checkout、同步客户端）修改了你正在打开的文件时,SoloMD 会原地刷新内容。有未保存改动的标签页仍会弹窗确认 —— 永远不会悄悄丢失你的编辑。',
+    autoReloadExternalChangesHint: '默认开启：当其他程序（其他编辑器、git checkout、同步客户端）修改了你正在打开的文件时,ZeroMD 会原地刷新内容。有未保存改动的标签页仍会弹窗确认 —— 永远不会悄悄丢失你的编辑。',
     autoSaveOnBlur: '窗口失去焦点时自动保存',
     autoSaveOnBlurHint: '开启后,切换到其他应用时会静默保存所有「已有文件路径且有改动」的标签页。新建未命名笔记会跳过（否则会弹出另存为对话框）。默认关闭 —— Cmd/Ctrl+S 仍可手动保存。',
     openFileInNewWindow: '用新窗口打开文件',
@@ -648,7 +646,7 @@ export const zh: I18n = {
     revealInFileTreeOnOpen: '打开文件后自动切到所在文件夹',
     revealInFileTreeOnOpenHint: "开启后，打开文件会自动把左侧文件树定位到文件所在文件夹；文件树已隐藏时保持隐藏。",
     openLinkedFilesExternally: '用默认程序打开链接的文件',
-    openLinkedFilesExternallyHint: '开启后，点击 Markdown 里指向本地 PDF / Office / 其他文档的链接，会用系统默认程序打开；关闭则转换成 Markdown 打开。指向 .md / 文本 / 图片的链接始终在 SoloMD 内打开。',
+    openLinkedFilesExternallyHint: '开启后，点击 Markdown 里指向本地 PDF / Office / 其他文档的链接，会用系统默认程序打开；关闭则转换成 Markdown 打开。指向 .md / 文本 / 图片的链接始终在 ZeroMD 内打开。',
     autoCheckUpdate: '自动检查更新',
     checkUpdate: '立即检查更新',
     checkingUpdate: '检查中…',
@@ -656,9 +654,9 @@ export const zh: I18n = {
     upToDate: '当前已是最新版本',
     updateCheckFailed: '无法连接更新服务器,请检查网络后重试',
     telemetry: '发送匿名使用数据',
-    telemetryHint: '帮助改进 SoloMD。不包含 IP、文件内容或任何个人信息。',
+    telemetryHint: '帮助改进 ZeroMD。不包含 IP、文件内容或任何个人信息。',
     telemetryNotice:
-      'SoloMD 会收集匿名使用数据（功能使用频率、版本、操作系统）以帮助改进产品，不含 IP、文件内容或任何个人信息。可在设置中随时关闭。',
+      'ZeroMD 会收集匿名使用数据（功能使用频率、版本、操作系统）以帮助改进产品，不含 IP、文件内容或任何个人信息。可在设置中随时关闭。',
     telemetryNoticeOk: '我知道了',
     telemetryNoticeDisable: '立即关闭',
     imageUploaderSection: '图片上传（图床）',
@@ -757,7 +755,7 @@ export const zh: I18n = {
   },
   toast: {
     imageInsertFailed: "图片插入失败：{error}",
-    imageSavedOutsideVault: "这个文件夹暂时无法存放图片，图片已保存到 SoloMD 自己的文档文件夹，并从那里引用。",
+    imageSavedOutsideVault: "这个文件夹暂时无法存放图片，图片已保存到 ZeroMD 自己的文档文件夹，并从那里引用。",
     newWindowFailed: '无法打开新窗口',
     noActiveDoc: '没有打开的文档',
     copied: '已复制',
@@ -780,7 +778,7 @@ export const zh: I18n = {
     uploadedCount: '已上传 {n} 张图片',
     noLocalImages: '没有可上传的本地图片',
     nothingToReopen: "没有可以恢复的已关闭标签页",
-    savedToIos: "已保存到「我的 iPhone › SoloMD › {name}」",
+    savedToIos: "已保存到「我的 iPhone › ZeroMD › {name}」",
     exportingFormat: "正在导出 {format}…",
     exportedTo: "已导出为 {format}",
     exportFailedError: "导出失败：{error}",
@@ -828,7 +826,7 @@ export const zh: I18n = {
     selectTextForAi: "请先选中一段文字，再点击 AI 改写（或按 {chord}）。",
     shareUnsupported: "当前 iOS 版本不支持分享",
     shareFailed: "分享失败：{error}",
-    androidAllFilesReturn: "请开启「所有文件访问权限」后返回，SoloMD 会自动重启以使权限生效。",
+    androidAllFilesReturn: "请开启「所有文件访问权限」后返回，ZeroMD 会自动重启以使权限生效。",
     pinyinCopied: "拼音已复制到剪贴板",
   },
   imageUrlDialog: {
@@ -1067,8 +1065,8 @@ export const zh: I18n = {
   integrations: {
     heading: '集成',
     intro:
-      'SoloMD 可与终端和支持 MCP 的 AI 客户端（Claude Desktop、Codex CLI、Cursor）连接，让你在 App 外读写笔记。',
-    cliTitle: '命令行（solomd）',
+      'ZeroMD 可与终端和支持 MCP 的 AI 客户端（Claude Desktop、Codex CLI、Cursor）连接，让你在 App 外读写笔记。',
+    cliTitle: '命令行（zeromd）',
     cliInstalled: '已安装于 {path}',
     cliNotInstalled: '未安装',
     cliVersionLabel: '版本',
@@ -1079,14 +1077,14 @@ export const zh: I18n = {
     cliInstallToast: '请在终端执行以下命令（写入 /usr/local/bin 需要 sudo）：',
     cliSubcommandsHeading: '可用子命令',
     cliSubcommands: {
-      open: 'open <标题|路径> —— 在 SoloMD 中打开一篇笔记',
+      open: 'open <标题|路径> —— 在 ZeroMD 中打开一篇笔记',
       new: 'new <标题> [正文] —— 新建并打开一篇笔记',
       list: 'list [文件夹] —— 列出 Markdown 文件',
       search: 'search <关键字> —— 在笔记中搜索',
       cat: 'cat <标题|路径> —— 把笔记内容输出到 stdout',
       help: 'help —— 查看全部命令',
     },
-    mcpTitle: 'MCP 服务器（solomd-mcp）',
+    mcpTitle: 'MCP 服务器（zeromd-mcp）',
     mcpBundled: '已随 App 一同打包：{path}',
     mcpNotBundled:
       '未打包（开发构建跳过 externalBin 旁路二进制）。正式发布版本始终包含。',
@@ -1116,7 +1114,7 @@ export const zh: I18n = {
     // ---- v4.4.5: 6 个 AI 客户端的 MCP 一键注入 ----
     aiClientsTitle: '一键接入你机器上的 AI 客户端',
     aiClientsIntro:
-      '一次点击，SoloMD 把自己的 MCP 服务器条目写进我们识别到的每一个 AI 客户端的 config。每次都是 JSON 原地合并（不影响你已有的条目），写之前会把原 config 备份到 <path>.bak.<时间戳>。',
+      '一次点击，ZeroMD 把自己的 MCP 服务器条目写进我们识别到的每一个 AI 客户端的 config。每次都是 JSON 原地合并（不影响你已有的条目），写之前会把原 config 备份到 <path>.bak.<时间戳>。',
     aiClientsNotInstalled: '未安装',
     aiClientsAlreadyConfigured: '已接入 ✓',
     aiClientsReady: '可注入',
@@ -1127,13 +1125,13 @@ export const zh: I18n = {
     aiClientsInjectBtnZero: '没有可注入的客户端',
     aiClientsInjectedToast:
       '✓ 已注入到 {n} 个客户端。重启对应 AI 客户端即可加载新 MCP server。',
-    aiClientsRemovedToast: '✓ 已从 {name} 移除 SoloMD 条目。',
+    aiClientsRemovedToast: '✓ 已从 {name} 移除 ZeroMD 条目。',
     aiClientsRestartHint:
       '注入完成后，重启对应 AI 客户端（或用它的 "Reload MCP servers" 命令）让新 server 生效。',
     // ---- v4.0 P4 联邦：MCP 配置档 ----
     profilesHeading: 'MCP 配置档',
     profilesIntro:
-      '把多个 workspace 打包到同一个 solomd-mcp 实例下，并一键复制可直接粘贴的 Claude Desktop 配置。每个配置档列出 MCP 服务器要暴露的 workspace（别名 + 路径）；第一项是默认值——工具调用没有显式指定 `workspace` 参数时会落到它上面。',
+      '把多个 workspace 打包到同一个 zeromd-mcp 实例下，并一键复制可直接粘贴的 Claude Desktop 配置。每个配置档列出 MCP 服务器要暴露的 workspace（别名 + 路径）；第一项是默认值——工具调用没有显式指定 `workspace` 参数时会落到它上面。',
     profilesEmpty: '暂无配置档。',
     profilesCreate: '新建配置档',
     profilesDuplicate: '复制',
@@ -1163,13 +1161,13 @@ export const zh: I18n = {
     profilesNamePlaceholder: 'work-and-home',
     profilesNewProfileDefault: '新建配置档',
     profilesNoMcpBinary:
-      '此 dev 构建未打包 solomd-mcp——配置片段中用占位路径代替。',
+      '此 dev 构建未打包 zeromd-mcp——配置片段中用占位路径代替。',
   },
   // v4.0 Pillar 2 — Agent Recipes（中文译为「Agent 任务」）
   recipes: {
     heading: 'Agent 任务',
     intro:
-      '声明式 agent 任务，以 YAML 形式存放在 vault 的 .solomd/agents/ 下。可按 cron 定时、保存时、提交时、添加标签时或手动触发。',
+      '声明式 agent 任务，以 YAML 形式存放在 vault 的 .zeromd/agents/ 下。可按 cron 定时、保存时、提交时、添加标签时或手动触发。',
     openWorkspace: '请先打开一个文件夹——任务存放于 vault 内。',
     list: '任务',
     listEmpty: '暂无任务。点击「新建任务」创建一条。',
@@ -1337,7 +1335,7 @@ export const zh: I18n = {
     settingsHeading: '语义搜索',
     enable: '启用语义搜索（本地 RAG，⌘⇧F）',
     enableHint:
-      '默认关闭。开启后，本工作区的笔记会被嵌入到 <workspace>/.solomd/embeddings.sqlite —— 完全本地，无需联网，自带的哈希三元组后端无需下载模型。⌘⇧F 打开面板。',
+      '默认关闭。开启后，本工作区的笔记会被嵌入到 <workspace>/.zeromd/embeddings.sqlite —— 完全本地，无需联网，自带的哈希三元组后端无需下载模型。⌘⇧F 打开面板。',
     statusReady: '已索引：{indexed} / {total} 篇笔记 · 共 {chunks} 块 · 后端 {backend}',
     statusEmpty: '尚未索引 —— 打开开关即可开始构建索引。',
     reindexNow: '立即重建索引',
@@ -1418,7 +1416,7 @@ export const zh: I18n = {
     captureHeading: 'HTTP 捕获端点',
     enableCapture: '启用 HTTP 捕获端点',
     enableCaptureHint:
-      '默认关闭。开启后，SoloMD 会在 127.0.0.1（仅本机回环）监听新笔记的 POST 请求 —— 来自浏览器扩展、iOS 快捷指令、Shell 脚本或 curl 都可以。新笔记会落到工作区的收件箱文件夹，并自动写入 `inbox: true`。',
+      '默认关闭。开启后，ZeroMD 会在 127.0.0.1（仅本机回环）监听新笔记的 POST 请求 —— 来自浏览器扩展、iOS 快捷指令、Shell 脚本或 curl 都可以。新笔记会落到工作区的收件箱文件夹，并自动写入 `inbox: true`。',
     endpoint: '端点',
     statusRunning: '运行中',
     statusStarting: '启动中…',
@@ -1444,7 +1442,7 @@ export const zh: I18n = {
       '本机 HTTP 接口，向不支持 MCP 的客户端（Alfred、Raycast、n8n、Shell、iOS 快捷指令…）暴露与 MCP 相同的工具集。',
     enable: '启用 REST API',
     enableHint:
-      '默认关闭。开启后 SoloMD 在 127.0.0.1（仅回环）监听，除公开 banner 外所有路由都需下方 Bearer token 鉴权。',
+      '默认关闭。开启后 ZeroMD 在 127.0.0.1（仅回环）监听，除公开 banner 外所有路由都需下方 Bearer token 鉴权。',
     endpoint: '端点',
     statusRunning: '运行中',
     statusStarting: '启动中…',
@@ -1471,7 +1469,7 @@ export const zh: I18n = {
     close: '关闭',
     chooseTitle: '配置你的 AI 助手',
     chooseSub:
-      'SoloMD 不依赖 AI 也可工作；但 Agent 面板与 Agent 任务需要选一个模型。两条路任选其一——任何时候都可以在 设置 → AI 中切换。',
+      'ZeroMD 不依赖 AI 也可工作；但 Agent 面板与 Agent 任务需要选一个模型。两条路任选其一——任何时候都可以在 设置 → AI 中切换。',
     cloudTitle: '云端（BYOK）',
     cloudBody:
       'Anthropic Claude、OpenAI ChatGPT、Google Gemini、DeepSeek 等 14 个 Provider，自带 API Key。',
@@ -1484,7 +1482,7 @@ export const zh: I18n = {
     localDetecting: '正在查找本机 Ollama 服务…',
     localNotRunning: '未在 localhost:11434 找到 Ollama 服务。',
     localNotRunningHint:
-      '请先安装 Ollama（约 80 MB）并启动，再点击「重试」。SoloMD 不内嵌 Ollama。',
+      '请先安装 Ollama（约 80 MB）并启动，再点击「重试」。ZeroMD 不内嵌 Ollama。',
     localInstallBtn: '安装 Ollama',
     localRetryBtn: '重试检测',
     localRunningNoModel:
@@ -1520,7 +1518,7 @@ export const zh: I18n = {
   cookbook: {
     heading: '任务范例集',
     intro:
-      '选择一个起步任务——安装会将 YAML 复制到 .solomd/agents/ 并自动打开供你编辑。可重复安装，每次自动追加后缀。',
+      '选择一个起步任务——安装会将 YAML 复制到 .zeromd/agents/ 并自动打开供你编辑。可重复安装，每次自动追加后缀。',
     browse: '浏览范例',
     preview: '预览 YAML',
     hidePreview: '隐藏预览',
@@ -1605,7 +1603,7 @@ export const zh: I18n = {
     autoEngageFocusHint: '启动番茄钟时自动开启专注模式；结束时恢复之前的状态。',
     defaultDuration: '默认时长',
     customDurationLabel: '自定义（分钟）',
-    notificationTitle: 'SoloMD —— 专注会话已完成',
+    notificationTitle: 'ZeroMD —— 专注会话已完成',
     notificationBody: '{minutes} 分钟 · 写了 {words} 词',
   },
   quickSwitcher: {
@@ -1674,7 +1672,7 @@ export const zh: I18n = {
   cloudSync: {
     detectedTitle: '工作区在 {label} 中',
     detectedHint:
-      '保存到这里的文件会自动同步到你其他装了同一云服务的设备。SoloMD 在此之上加了跨设备会话恢复 —— 在另一台机器打开同一个工作区时，原来的标签页会回来。',
+      '保存到这里的文件会自动同步到你其他装了同一云服务的设备。ZeroMD 在此之上加了跨设备会话恢复 —— 在另一台机器打开同一个工作区时，原来的标签页会回来。',
     siblingCount: '此工作区有 {n} 台其它设备打开过。',
     restoreTitle: '从上次的位置接着写？',
     restoreLead: '{device} 在 {ago} 保存了 {tabs} 个标签页。要在本机也打开吗？',
@@ -1691,7 +1689,7 @@ export const zh: I18n = {
   githubSync: {
     heading: 'GitHub 同步',
     intro:
-      '把笔记仓库推送到你自己的 GitHub 私有仓库，多设备自动同步。数据始终在你自己账户里 —— SoloMD 只是替你跑 git push / git pull。',
+      '把笔记仓库推送到你自己的 GitHub 私有仓库，多设备自动同步。数据始终在你自己账户里 —— ZeroMD 只是替你跑 git push / git pull。',
     signInTitle: '连接 GitHub',
     signInHint:
       '粘贴一个 Personal Access Token。Token 仅保存在系统钥匙串里，除 api.github.com 外不发往任何地方。',
@@ -1779,11 +1777,11 @@ export const zh: I18n = {
     conflictResolveFailed: '解决失败',
     keychainHintTitle: 'macOS 会问钥匙串密码 —— 一定点「始终允许」',
     keychainHintBody:
-      '第一次推送到 GitHub 时，macOS 弹钥匙串对话框是为了让 SoloMD 读取保存的 token。如果开了端到端加密，会再弹一次问加密钥匙。两次都请点「始终允许」（不要只点「允许」）—— 这样 SoloMD 就被永久授权，以后这台 Mac 上再也不会问。点「允许」是一次性的，下次推送还会问。',
+      '第一次推送到 GitHub 时，macOS 弹钥匙串对话框是为了让 ZeroMD 读取保存的 token。如果开了端到端加密，会再弹一次问加密钥匙。两次都请点「始终允许」（不要只点「允许」）—— 这样 ZeroMD 就被永久授权，以后这台 Mac 上再也不会问。点「允许」是一次性的，下次推送还会问。',
     proxyTitle: 'HTTPS 代理（防火墙 / 公司网络穿透）',
     proxyPlaceholder: 'http://127.0.0.1:7897 或 socks5://127.0.0.1:1080',
     proxyHint:
-      '把 git 推/拉走这个代理。留空就直连。macOS 应用从 Finder 启动时不继承 shell 里的 HTTPS_PROXY 变量，所以专门在这里给 SoloMD 设。github.com 直连超时时填这个就好。',
+      '把 git 推/拉走这个代理。留空就直连。macOS 应用从 Finder 启动时不继承 shell 里的 HTTPS_PROXY 变量，所以专门在这里给 ZeroMD 设。github.com 直连超时时填这个就好。',
     proxySaveBtn: '保存代理',
     proxySaving: '保存中…',
     proxySavedToast: '代理已保存。',
@@ -1801,7 +1799,7 @@ export const zh: I18n = {
     upgradeRowBody: '你的笔记现在以明文形式推送到 GitHub。启用端到端加密后，远端只能看到密文。',
     upgradeRowBtn: '启用加密',
     upgradeFormTitle: '启用端到端加密',
-    upgradeFormBody: '设一个口令。SoloMD 会用 Argon2id 派生密钥，重新加密所有文件后再推送。',
+    upgradeFormBody: '设一个口令。ZeroMD 会用 Argon2id 派生密钥，重新加密所有文件后再推送。',
     upgradeForcePushWarning:
       '将强制推送加密版本，**远端原本的明文历史会被覆盖、不再可达**。已经 clone 过这个仓库的人需要重新 clone。**口令丢失 = 笔记永远找不回**。',
     upgradePassphrasePlaceholder: '库口令（至少 8 个字符）',
@@ -1843,7 +1841,7 @@ export const zh: I18n = {
       "把你的笔记库推送到 Gitea 服务器。填写服务器地址和个人访问令牌即可开始。",
     giteaUrlTitle: "Gitea 服务器地址",
     giteaUrlHint:
-      "你的 Gitea 实例的根地址（例如 https://gitea.com 或你自己的服务器）。SoloMD 会自动加上 /api/v1。",
+      "你的 Gitea 实例的根地址（例如 https://gitea.com 或你自己的服务器）。ZeroMD 会自动加上 /api/v1。",
     giteaUrlValidateBtn: "验证地址",
     giteaUrlValidating: "正在验证…",
     giteaTokenTitle: "Gitea 个人访问令牌",

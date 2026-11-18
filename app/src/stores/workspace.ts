@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia';
 import { useTabsStore } from './tabs';
 
-const LS_KEY = 'solomd.workspace.v1';
+const LS_KEY = 'zeromd.workspace.v1';
 const MAX_RECENT = 12;
 const MAX_RECENT_FOLDERS = 8;
 

@@ -1,5 +1,5 @@
 /**
- * cm-live-render.ts — WYSIWYG "live edit" CM6 extension for SoloMD v2.3
+ * cm-live-render.ts — WYSIWYG "live edit" CM6 extension for ZeroMD v2.3
  *
  * Goes further than `cm-live-preview.ts`. The preview-style extension hides
  * a few marker characters and lets the HighlightStyle do the rest. This
@@ -966,7 +966,7 @@ export function liveEditExtension(blocks: any[] = [], opts: { showMarkers?: bool
 }
 
 // ---------------------------------------------------------------------------
-// Self-test hook (used by dev-mcp `solomd_get_editor_decorations`).
+// Self-test hook (used by dev-mcp `zeromd_get_editor_decorations`).
 //
 // We expose a tiny window-level helper that, when the editor is mounted,
 // reports the current visible-range decoration counts. The Tauri webview
@@ -978,7 +978,7 @@ export function liveEditExtension(blocks: any[] = [], opts: { showMarkers?: bool
 
 /**
  * Stable list of class names this extension emits, exported so the dev-mcp
- * `solomd_get_editor_decorations` tool (and any future automated tests)
+ * `zeromd_get_editor_decorations` tool (and any future automated tests)
  * can assert on them.
  */
 export const LIVE_EDIT_CLASSES = [

@@ -1,10 +1,10 @@
 /**
  * What a click on a rendered Markdown link does — shared by the preview and
  * the Windows live-edit blocks, so neither can ever let the webview follow
- * the link itself. Following it replaced the whole SoloMD UI with the web
+ * the link itself. Following it replaced the whole ZeroMD UI with the web
  * page (and on Windows left no way out but right-click → Back).
  *
- *   - wikilink            → resolved in-app (`solomd:wiki-open`)
+ *   - wikilink            → resolved in-app (`zeromd:wiki-open`)
  *   - `#heading`          → left to the browser (in-page jump)
  *   - http(s) / mailto    → the system browser
  *   - a relative path     → opened against the current file (`openLinkedFile`)
@@ -23,7 +23,7 @@ export function openRenderedLink(anchor: Element, e: Event, filePath?: string | 
     if (!target) return false;
     e.preventDefault();
     e.stopPropagation();
-    window.dispatchEvent(new CustomEvent('solomd:wiki-open', { detail: { target } }));
+    window.dispatchEvent(new CustomEvent('zeromd:wiki-open', { detail: { target } }));
     return true;
   }
   const href =

@@ -1,9 +1,9 @@
-# SoloMD Brand Guide
+# ZeroMD Brand Guide
 
 The local-first Markdown editor where agents live alongside your writing.
 
 ## Name
-**SoloMD** — "Solo" evokes single-file, single-window, distraction-free; **MD** signals Markdown.
+**ZeroMD** — "Solo" evokes single-file, single-window, distraction-free; **MD** signals Markdown.
 
 ## Brand idea
 
@@ -16,8 +16,8 @@ mobile home screens.
 
 | File | Use |
 |---|---|
-| `solomd-mark.svg` | Canonical, geometry-only app mark |
-| `solomd_icon_fullbleed.png` | Cross-platform 1024px app icon master |
+| `zeromd-mark.svg` | Canonical, geometry-only app mark |
+| `zeromd_icon_fullbleed.png` | Cross-platform 1024px app icon master |
 | `file_icon.svg` | Canonical Markdown/plain-text document icon |
 | `gen_icons.sh` | Regenerates platform app icons and document icon bundles |
 

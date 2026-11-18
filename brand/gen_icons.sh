@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Regenerate SoloMD app and Markdown document icons from the SVG masters.
+# Regenerate ZeroMD app and Markdown document icons from the SVG masters.
 set -euo pipefail
 
 BRAND_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -12,13 +12,13 @@ command -v rsvg-convert >/dev/null
 
 # App icon: Tauri creates the cross-platform matrix, then the macOS helper
 # applies the platform-specific safe area and continuous-corner mask.
-magick -background none "$BRAND_DIR/solomd-mark.svg" -resize 1024x1024 -depth 8 -strip \
-  "$BRAND_DIR/solomd_icon_fullbleed.png"
-magick "$BRAND_DIR/solomd_icon_fullbleed.png" -alpha off -depth 8 -strip \
+magick -background none "$BRAND_DIR/zeromd-mark.svg" -resize 1024x1024 -depth 8 -strip \
+  "$BRAND_DIR/zeromd_icon_fullbleed.png"
+magick "$BRAND_DIR/zeromd_icon_fullbleed.png" -alpha off -depth 8 -strip \
   "$REPO_DIR/app-store/icon-1024.png"
 (
   cd "$REPO_DIR/app"
-  pnpm tauri icon ../brand/solomd_icon_fullbleed.png --output src-tauri/icons
+  pnpm tauri icon ../brand/zeromd_icon_fullbleed.png --output src-tauri/icons
 )
 "$REPO_DIR/scripts/gen-mac-icon.sh"
 
@@ -26,7 +26,7 @@ magick "$BRAND_DIR/solomd_icon_fullbleed.png" -alpha off -depth 8 -strip \
 # the checked-in iOS and Android matrices deterministic as a final pass.
 for target in "$ICON_DIR"/ios/AppIcon-*.png; do
   read -r width height < <(magick identify -format '%w %h\n' "$target")
-  magick "$BRAND_DIR/solomd_icon_fullbleed.png" -resize "${width}x${height}!" \
+  magick "$BRAND_DIR/zeromd_icon_fullbleed.png" -resize "${width}x${height}!" \
     -depth 8 -strip "$target"
 done
 
@@ -41,14 +41,14 @@ fi
 for spec in mdpi:48:108 hdpi:72:162 xhdpi:96:216 xxhdpi:144:324 xxxhdpi:192:432; do
   IFS=: read -r density launcher foreground <<< "$spec"
   android_dir="$ICON_DIR/android/mipmap-$density"
-  magick "$BRAND_DIR/solomd_icon_fullbleed.png" -resize "${launcher}x${launcher}!" -depth 8 -strip \
+  magick "$BRAND_DIR/zeromd_icon_fullbleed.png" -resize "${launcher}x${launcher}!" -depth 8 -strip \
     "$android_dir/ic_launcher.png"
   half=$((launcher / 2))
-  magick "$BRAND_DIR/solomd_icon_fullbleed.png" -resize "${launcher}x${launcher}!" \
+  magick "$BRAND_DIR/zeromd_icon_fullbleed.png" -resize "${launcher}x${launcher}!" \
     \( -size "${launcher}x${launcher}" xc:none -fill white \
        -draw "circle $half,$half $half,0" \) \
     -alpha off -compose CopyOpacity -composite -depth 8 -strip "$android_dir/ic_launcher_round.png"
-  magick "$BRAND_DIR/solomd_icon_fullbleed.png" -resize "${foreground}x${foreground}!" -depth 8 -strip \
+  magick "$BRAND_DIR/zeromd_icon_fullbleed.png" -resize "${foreground}x${foreground}!" -depth 8 -strip \
     "$android_dir/ic_launcher_foreground.png"
 done
 
@@ -95,4 +95,4 @@ for locale in "" "-zh"; do
   cp "$BRAND_DIR/og-image${locale}.png" "$REPO_DIR/web/public/og-image${locale}.png"
 done
 
-echo "Regenerated SoloMD app and document icon families."
+echo "Regenerated ZeroMD app and document icon families."

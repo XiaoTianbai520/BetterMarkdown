@@ -229,7 +229,7 @@ async function prepareLocalTarget(
   // #349 — a note in a SAF vault has a `saf:<documentId>` path. Joining
   // `_assets/` onto it gives a string that no filesystem call can write, so
   // the image was silently lost. SAF can't store binary files yet: keep the
-  // image in SoloMD's own Documents folder and link it by absolute path
+  // image in ZeroMD's own Documents folder and link it by absolute path
   // (the asset protocol scope covers it, so it renders), and say so.
   if (isSafPath(filePath)) {
     let base: string;
@@ -259,7 +259,7 @@ async function prepareLocalTarget(
     };
   }
   const t = await resolveTempDir(opts.tempDir);
-  const fullPath = joinPath(joinPath(t, 'solomd', sepCh), filename, sepCh);
+  const fullPath = joinPath(joinPath(t, 'zeromd', sepCh), filename, sepCh);
   // Forward slashes in the markdown URL — markdown-it eats `\` as escapes on
   // Windows, mangling the preview src. (No-op on macOS/Linux.)
   return { fullPath, insertText: markdownImage(fullPath.replace(/\\/g, '/')) };
@@ -273,7 +273,7 @@ async function prepareTempTarget(
 ): Promise<string> {
   const sepCh = getSep();
   const t = await resolveTempDir(opts.tempDir);
-  return joinPath(joinPath(t, 'solomd', sepCh), filename, sepCh);
+  return joinPath(joinPath(t, 'zeromd', sepCh), filename, sepCh);
 }
 
 async function writeBytes(fullPath: string, bytes: Uint8Array): Promise<boolean> {
@@ -381,7 +381,7 @@ async function saveAndInsert(
     srcPath = temp;
   }
 
-  const token = `solomd-uploading-${randSuffix()}${randSuffix()}`;
+  const token = `zeromd-uploading-${randSuffix()}${randSuffix()}`;
   insertAtCursor(view, `![](${token})`);
   const finalText = await performUpload(up, srcPath, opts, async () => {
     // On failure keep a local copy: assets file already exists when keepLocal;
@@ -645,7 +645,7 @@ export async function insertImageFromPath(
     await invoke('copy_file', { src: srcPath, dst: local.fullPath });
     uploadSrc = local.fullPath;
   }
-  const token = `solomd-uploading-${randSuffix()}${randSuffix()}`;
+  const token = `zeromd-uploading-${randSuffix()}${randSuffix()}`;
   insertAtCursor(view, `![](${token})`);
   const finalText = await performUpload(up, uploadSrc, opts, async () => {
     if (up.keepLocal) return local.insertText;

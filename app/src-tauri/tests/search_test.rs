@@ -6,7 +6,7 @@ use std::sync::Once;
 static FIXTURE: Once = Once::new();
 
 fn fixture_dir() -> PathBuf {
-    std::env::temp_dir().join("solomd-search-test")
+    std::env::temp_dir().join("zeromd-search-test")
 }
 
 fn ensure_fixture() {

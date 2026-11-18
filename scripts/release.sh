@@ -39,7 +39,7 @@ rm -f app/package.json.bak
 # Cargo.toml (in src-tauri)
 sed -i.bak -E "s/^version = \"[^\"]+\"/version = \"$VERSION\"/" app/src-tauri/Cargo.toml
 rm -f app/src-tauri/Cargo.toml.bak
-(cd app/src-tauri && cargo update -p solomd --offline --quiet 2>/dev/null || true)
+(cd app/src-tauri && cargo update -p zeromd --offline --quiet 2>/dev/null || true)
 
 git add app/src-tauri/tauri.conf.json app/package.json app/src-tauri/Cargo.toml app/src-tauri/Cargo.lock 2>/dev/null || true
 git commit -m "chore: bump version to $VERSION"

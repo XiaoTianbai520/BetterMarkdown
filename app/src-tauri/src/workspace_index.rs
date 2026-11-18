@@ -7,7 +7,7 @@
 //! `<app_data_dir>/index/<hash(folder)>.json` so warm starts are fast.
 //!
 //! A file watcher (notify) keeps the index live; on debounced changes the
-//! affected file is re-scanned and an `solomd://index-updated` event is
+//! affected file is re-scanned and an `zeromd://index-updated` event is
 //! emitted to the frontend.
 
 use serde::{Deserialize, Serialize};
@@ -147,7 +147,7 @@ fn workspace_index_init_inner(app: AppHandle, folder: String) -> Result<usize, S
 
     let count = STATE.read().map_err(|e| e.to_string())?.entries.len();
     save_cache(&app, &root)?;
-    let _ = app.emit("solomd://index-updated", &"init");
+    let _ = app.emit("zeromd://index-updated", &"init");
     Ok(count)
 }
 
@@ -372,7 +372,7 @@ fn workspace_index_rescan_inner(app: AppHandle) -> Result<usize, String> {
     }
     scan_into(&root)?;
     save_cache(&app, &root)?;
-    let _ = app.emit("solomd://index-updated", &"rescan");
+    let _ = app.emit("zeromd://index-updated", &"rescan");
     let count = STATE.read().map_err(|e| e.to_string())?.entries.len();
     Ok(count)
 }
@@ -1011,7 +1011,7 @@ fn handle_event(app: &AppHandle, event: Event) {
             if let Some(root) = root {
                 let _ = save_cache(&app_for_thread, &root);
             }
-            let _ = app_for_thread.emit("solomd://index-updated", &"watch");
+            let _ = app_for_thread.emit("zeromd://index-updated", &"watch");
         }
     });
 }

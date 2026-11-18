@@ -22,7 +22,7 @@ import {
 } from '@codemirror/view';
 import { frozenDuringComposition, isImeSafeFlushTransaction } from './cm-ime-guard';
 
-const TOGGLE_EVENT = 'solomd-task-toggle';
+const TOGGLE_EVENT = 'zeromd-task-toggle';
 
 interface ToggleDetail {
   from: number;

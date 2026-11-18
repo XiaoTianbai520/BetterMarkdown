@@ -118,7 +118,7 @@ export function useFileWatcher(showDialog: ShowDialog) {
     if (pendingPaths.has(filePath)) return;
 
     // The decision reads tab.content, which lags the editor by a debounce.
-    window.dispatchEvent(new Event('solomd:flush-content-sync'));
+    window.dispatchEvent(new Event('zeromd:flush-content-sync'));
 
     pendingPaths.add(filePath);
     try {
@@ -129,7 +129,7 @@ export function useFileWatcher(showDialog: ShowDialog) {
           // second one. Wait for a pause, then look again: the user may have
           // saved meanwhile, or the change may have been ours after all.
           await waitForTypingPause();
-          window.dispatchEvent(new Event('solomd:flush-content-sync'));
+          window.dispatchEvent(new Event('zeromd:flush-content-sync'));
           if (!tabs.tabs.includes(tab)) continue;
           decision = await decide(tab, filePath);
         }
@@ -176,11 +176,11 @@ export function useFileWatcher(showDialog: ShowDialog) {
    * cannot see.
    *
    * Tabs are persisted with their text, so what you see after a restart is
-   * what was in the buffer when SoloMD closed — never compared against the
+   * what was in the buffer when ZeroMD closed — never compared against the
    * file. The Rust watcher only reports changes while the app is running and
    * the path is registered, and it deliberately filters events that look like
    * our own writes (an mtime within tolerance of a save, and a 30s window
-   * after a sync rewrite). So a file edited in another editor while SoloMD
+   * after a sync rewrite). So a file edited in another editor while ZeroMD
    * was closed — the reported case — was shown stale forever, and the obvious
    * remedy of opening the file again did nothing either.
    *
@@ -257,7 +257,7 @@ export function useFileWatcher(showDialog: ShowDialog) {
     await syncWatchedPaths();
 
     try {
-      unlisten = await listen<string>('solomd://file-changed', (e) => {
+      unlisten = await listen<string>('zeromd://file-changed', (e) => {
         if (e.payload) handleFileChanged(e.payload);
       });
     } catch (e) {

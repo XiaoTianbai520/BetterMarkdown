@@ -11,8 +11,8 @@
  * — exactly when it isn't needed.
  *
  * Every button goes through an existing path: `fmt.*` via
- * `solomd:format-markdown` (the same handler as the shortcut), the insert-image
- * command via `solomd:menu-action`, undo/redo via `solomd:editor-history`. The
+ * `zeromd:format-markdown` (the same handler as the shortcut), the insert-image
+ * command via `zeromd:menu-action`, undo/redo via `zeromd:editor-history`. The
  * buttons never take focus (`mousedown.prevent`), so the keyboard stays up.
  *
  * `?forceKeyboardBar` (dev only) previews it in a desktop browser, pinned to
@@ -145,16 +145,16 @@ const visible = computed(
 );
 
 function format(kind: string) {
-  window.dispatchEvent(new CustomEvent('solomd:format-markdown', { detail: { kind } }));
+  window.dispatchEvent(new CustomEvent('zeromd:format-markdown', { detail: { kind } }));
 }
 function insertImage() {
-  window.dispatchEvent(new CustomEvent('solomd:menu-action', { detail: 'editor.insertImage' }));
+  window.dispatchEvent(new CustomEvent('zeromd:menu-action', { detail: 'editor.insertImage' }));
 }
 function undo() {
-  window.dispatchEvent(new CustomEvent('solomd:editor-history', { detail: { op: 'undo' } }));
+  window.dispatchEvent(new CustomEvent('zeromd:editor-history', { detail: { op: 'undo' } }));
 }
 function redo() {
-  window.dispatchEvent(new CustomEvent('solomd:editor-history', { detail: { op: 'redo' } }));
+  window.dispatchEvent(new CustomEvent('zeromd:editor-history', { detail: { op: 'redo' } }));
 }
 function hideKeyboard() {
   const a = document.activeElement;

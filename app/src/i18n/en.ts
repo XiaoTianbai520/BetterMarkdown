@@ -2,12 +2,12 @@ export const en = {
   // Windows unified title bar — in-app File/Edit/View/Help menubar
   // (Toolbar.vue). Strings mirror the native menu (runner.rs strings_for).
   iosFolder: {
-    pickerUnavailable: 'The folder picker isn\'t available, so SoloMD uses its own folder (Files app › On My iPhone › SoloMD).',
+    pickerUnavailable: 'The folder picker isn\'t available, so ZeroMD uses its own folder (Files app › On My iPhone › ZeroMD).',
     savedAs: 'Saved as {name}',
-    restoreFailed: 'Couldn\'t reopen the folder you picked last time — showing SoloMD\'s own folder. Use Open Folder to choose it again.',
+    restoreFailed: 'Couldn\'t reopen the folder you picked last time — showing ZeroMD\'s own folder. Use Open Folder to choose it again.',
   },
   starPrompt: {
-    message: 'Enjoying SoloMD? A GitHub star helps other people find it — it\'s made by one developer, and free.',
+    message: 'Enjoying ZeroMD? A GitHub star helps other people find it — it\'s made by one developer, and free.',
     action: '★ Star on GitHub',
   },
   menubar: {
@@ -86,10 +86,10 @@ export const en = {
     theme: "Theme",
     checkUpdate: "Check for Updates…",
     services: "Services",
-    hide: "Hide SoloMD",
+    hide: "Hide ZeroMD",
     hideOthers: "Hide Others",
     showAll: "Show All",
-    quit: "Quit SoloMD",
+    quit: "Quit ZeroMD",
     window: "Window",
     quickCapture: "Quick Capture…",
     daily: "Daily Note",
@@ -304,7 +304,7 @@ export const en = {
     empty: 'No sub-folders here.',
     cancel: 'Cancel',
     use: 'Use this folder',
-    permNeeded: 'SoloMD needs “All files access” to browse folders on this device.',
+    permNeeded: 'ZeroMD needs “All files access” to browse folders on this device.',
     permGrant: 'Grant access',
   },
   plainFind: {
@@ -426,7 +426,7 @@ export const en = {
     catAdvanced: 'Advanced',
     catKeys: 'Shortcuts',
     keysInterceptedTitle: "Some shortcuts are being taken by other software",
-    keysInterceptedBody: "These chords are registered as global hotkeys by the programs named below, so they never reach SoloMD. Switching the commands to the keys on the right leaves the rest of your shortcuts alone.",
+    keysInterceptedBody: "These chords are registered as global hotkeys by the programs named below, so they never reach ZeroMD. Switching the commands to the keys on the right leaves the rest of your shortcuts alone.",
     keysApplyCompat: "Move these commands to free keys",
     keysCompatApplied: "Moved {count} shortcuts. Use “Reset all” to undo.",
     keysSearch: "Search shortcuts — a name or a key…",
@@ -440,7 +440,7 @@ export const en = {
     keysWriterApply: "Use {bold} for bold",
     keysWriterUndo: "Switch back",
     keysWriterApplied: "{bold} is now bold. The file tree is on {tree}.",
-    keysInterceptedBy: "Usually taken by {source} before SoloMD sees it",
+    keysInterceptedBy: "Usually taken by {source} before ZeroMD sees it",
     keysHint: 'Click Change, then press the chord you want. Esc cancels. Bindings apply immediately.',
     keysCatFile: 'File',
     keysCatEdit: 'Edit',
@@ -585,8 +585,6 @@ export const en = {
       codeThemeDark: 'Always dark',
       frontmatterHint: 'Override per document with a `pdf:` block in YAML front matter (pageSize / margin / font / fontSize / footer / toc).',
     },
-    imageExportBranding: 'Append "Created with SoloMD" footer when exporting as image',
-    imageExportBrandingHint: 'On by default — mild self-promotion on shared screenshots. Turn off if you don\'t want the watermark, and short notes will also export tighter without the trailing card.',
     attachmentMode: 'Where to save pasted/dropped images',
     attachmentModeShared: 'Shared `_assets/` folder per directory',
     attachmentModePerFile: 'Per-file `<note>.assets/` folder',
@@ -599,7 +597,7 @@ export const en = {
     spellCheck: 'Spell Check (browser)',
     spellcheckLang: 'Dictionary',
     spellcheckAddDict: 'Open dictionary folder',
-    spellcheckLangHint: 'Only en_US ships with SoloMD. Drop a Hunspell <code>.aff</code> + <code>.dic</code> pair (e.g. from the LibreOffice dictionaries) into that folder and it appears here.',
+    spellcheckLangHint: 'Only en_US ships with ZeroMD. Drop a Hunspell <code>.aff</code> + <code>.dic</code> pair (e.g. from the LibreOffice dictionaries) into that folder and it appears here.',
     focusMode: 'Focus Mode — dim non-active paragraphs',
     toolbarHidden: "Hide toolbar buttons (keep the title bar)",
     toolbarHiddenHint: "For keyboard-only writing. Bring them back with {key} or the command palette.",
@@ -627,9 +625,9 @@ export const en = {
     customCssReloadFailed: 'Could not reload custom CSS theme',
     clear: 'Clear',
     fileAssoc: 'File Association',
-    setDefault: '⭐ Set SoloMD as default Markdown editor',
+    setDefault: '⭐ Set ZeroMD as default Markdown editor',
     settingDefault: 'Setting…',
-    setDefaultHint: 'Registers SoloMD as the default app for .md / .markdown / .mdown / .mkd files. On Windows, also adds SoloMD to the "Open with" menu. On Linux requires xdg-utils.',
+    setDefaultHint: 'Registers ZeroMD as the default app for .md / .markdown / .mdown / .mkd files. On Windows, also adds ZeroMD to the "Open with" menu. On Linux requires xdg-utils.',
     language: 'Language / 语言',
     restoreSession: 'Restore previous tabs and panes on startup',
     restoreSessionHint: 'Turn off to start with a blank window every time.',
@@ -649,7 +647,7 @@ export const en = {
     revealInFileTreeOnOpen: 'Reveal file in file tree on open',
     revealInFileTreeOnOpenHint: "When on, opening a file points the file tree at its parent folder. A hidden file tree stays hidden.",
     openLinkedFilesExternally: 'Open linked files with the system default app',
-    openLinkedFilesExternallyHint: 'When on, clicking a Markdown link to a local PDF / Office / other document opens it in the OS default app. Turn off to convert it to Markdown instead. Links to .md / text / images always open inside SoloMD.',
+    openLinkedFilesExternallyHint: 'When on, clicking a Markdown link to a local PDF / Office / other document opens it in the OS default app. Turn off to convert it to Markdown instead. Links to .md / text / images always open inside ZeroMD.',
     autoCheckUpdate: 'Automatically check for updates',
     checkUpdate: 'Check for updates now',
     checkingUpdate: 'Checking…',
@@ -658,9 +656,9 @@ export const en = {
     updateCheckFailed: "Couldn't reach update server — check your network and try again",
     telemetry: 'Send anonymous usage data',
     telemetryHint:
-      'Helps improve SoloMD. No IP address, no file contents, no personal information.',
+      'Helps improve ZeroMD. No IP address, no file contents, no personal information.',
     telemetryNotice:
-      'SoloMD collects anonymous usage data (feature usage, version, OS) to help improve the product. No IP address, file contents, or personal information. You can disable this any time in settings.',
+      'ZeroMD collects anonymous usage data (feature usage, version, OS) to help improve the product. No IP address, file contents, or personal information. You can disable this any time in settings.',
     telemetryNoticeOk: 'Got it',
     telemetryNoticeDisable: 'Disable now',
     imageUploaderSection: 'Image upload (image hosting)',
@@ -762,7 +760,7 @@ export const en = {
   },
   toast: {
     imageInsertFailed: "Couldn't insert the image: {error}",
-    imageSavedOutsideVault: "This folder can't hold images yet, so the image was saved in SoloMD's own Documents folder and linked from there.",
+    imageSavedOutsideVault: "This folder can't hold images yet, so the image was saved in ZeroMD's own Documents folder and linked from there.",
     newWindowFailed: 'Could not open a new window',
     noActiveDoc: 'No active document',
     copied: 'Copied',
@@ -785,7 +783,7 @@ export const en = {
     uploadedCount: 'Uploaded {n} image(s)',
     noLocalImages: 'No local images to upload',
     nothingToReopen: "No recently closed tab to reopen",
-    savedToIos: "Saved to On My iPhone › SoloMD › {name}",
+    savedToIos: "Saved to On My iPhone › ZeroMD › {name}",
     exportingFormat: "Exporting {format}…",
     exportedTo: "Exported to {format}",
     exportFailedError: "Export failed: {error}",
@@ -833,7 +831,7 @@ export const en = {
     selectTextForAi: "Select some text first, then click AI rewrite (or press {chord}).",
     shareUnsupported: "Sharing is not supported on this iOS version",
     shareFailed: "Share failed: {error}",
-    androidAllFilesReturn: "Turn on “All files access”, then come back — SoloMD restarts itself so the permission takes effect.",
+    androidAllFilesReturn: "Turn on “All files access”, then come back — ZeroMD restarts itself so the permission takes effect.",
     pinyinCopied: "Pinyin copied to clipboard",
   },
   imageUrlDialog: {
@@ -1072,8 +1070,8 @@ export const en = {
   integrations: {
     heading: 'Integrations',
     intro:
-      'SoloMD speaks to your terminal and to MCP-aware AI clients (Claude Desktop, Codex CLI, Cursor) so you can read/write your notes from outside the app.',
-    cliTitle: 'CLI (solomd)',
+      'ZeroMD speaks to your terminal and to MCP-aware AI clients (Claude Desktop, Codex CLI, Cursor) so you can read/write your notes from outside the app.',
+    cliTitle: 'CLI (zeromd)',
     cliInstalled: 'Installed at {path}',
     cliNotInstalled: 'Not installed',
     cliVersionLabel: 'Version',
@@ -1085,14 +1083,14 @@ export const en = {
       'Run this in your terminal — sudo is required for /usr/local/bin:',
     cliSubcommandsHeading: 'What can it do?',
     cliSubcommands: {
-      open: 'open <title|path> — open a note in SoloMD',
+      open: 'open <title|path> — open a note in ZeroMD',
       new: 'new <title> [text] — create + open a new note',
       list: 'list [folder] — list markdown files',
       search: 'search <query> — grep your notes',
       cat: 'cat <title|path> — print a note to stdout',
       help: 'help — show all commands',
     },
-    mcpTitle: 'MCP server (solomd-mcp)',
+    mcpTitle: 'MCP server (zeromd-mcp)',
     mcpBundled: 'Bundled at {path}',
     mcpNotBundled:
       'Not bundled (this dev build skips the externalBin sidecar). Production builds always include it.',
@@ -1121,9 +1119,9 @@ export const en = {
     mcpWriteNote:
       'write_note + append_to_note are off by default. Pass --allow-write to opt in.',
     // ---- v4.4.5: MCP auto-install across 6 AI clients ----------------
-    aiClientsTitle: 'Hook SoloMD into your AI clients',
+    aiClientsTitle: 'Hook ZeroMD into your AI clients',
     aiClientsIntro:
-      'One click and SoloMD writes its MCP server entry into the config of every AI client we recognise on this machine. Each write is JSON-merged in place (existing entries are preserved) and the original config is backed up to <path>.bak.<timestamp> before any change.',
+      'One click and ZeroMD writes its MCP server entry into the config of every AI client we recognise on this machine. Each write is JSON-merged in place (existing entries are preserved) and the original config is backed up to <path>.bak.<timestamp> before any change.',
     aiClientsNotInstalled: 'not installed',
     aiClientsAlreadyConfigured: 'configured ✓',
     aiClientsReady: 'ready to inject',
@@ -1131,17 +1129,17 @@ export const en = {
     aiClientsRemoveBtn: 'Remove',
     aiClientsAllowWrite:
       'Allow writes (--allow-write on the MCP server)',
-    aiClientsInjectBtn: 'Inject SoloMD into {n} client(s)',
+    aiClientsInjectBtn: 'Inject ZeroMD into {n} client(s)',
     aiClientsInjectBtnZero: 'Nothing to inject',
     aiClientsInjectedToast:
-      '✓ Injected SoloMD into {n} client(s). Restart the AI client(s) for the new MCP server to load.',
-    aiClientsRemovedToast: '✓ Removed SoloMD entry from {name}.',
+      '✓ Injected ZeroMD into {n} client(s). Restart the AI client(s) for the new MCP server to load.',
+    aiClientsRemovedToast: '✓ Removed ZeroMD entry from {name}.',
     aiClientsRestartHint:
       'After injecting, restart the AI client (or use its "Reload MCP servers" command if it has one) for the new server to load.',
     // ---- v4.0 P4 federation: MCP profiles -----------------------------
     profilesHeading: 'MCP profiles',
     profilesIntro:
-      'Bundle multiple workspaces under a single solomd-mcp instance, then copy a ready-to-paste Claude Desktop config block. Each profile lists the workspaces (alias + path) the MCP server will expose; the first entry is the default — tool calls without an explicit `workspace` argument fall through to it.',
+      'Bundle multiple workspaces under a single zeromd-mcp instance, then copy a ready-to-paste Claude Desktop config block. Each profile lists the workspaces (alias + path) the MCP server will expose; the first entry is the default — tool calls without an explicit `workspace` argument fall through to it.',
     profilesEmpty: 'No profiles yet.',
     profilesCreate: 'New profile',
     profilesDuplicate: 'Duplicate',
@@ -1171,14 +1169,14 @@ export const en = {
     profilesNamePlaceholder: 'work-and-home',
     profilesNewProfileDefault: 'New profile',
     profilesNoMcpBinary:
-      'solomd-mcp not bundled in this dev build — the snippet uses a placeholder path.',
+      'zeromd-mcp not bundled in this dev build — the snippet uses a placeholder path.',
   },
   // v4.0 Pillar 2 — Agent Recipes (Settings → Integrations panel).
   // TODO(zh): translate these once the en strings stabilise.
   recipes: {
     heading: 'Agent recipes',
     intro:
-      'Declarative agent jobs as YAML in your vault under .solomd/agents/. They run on a cron schedule, on save, on commit, on tag-add, or manually.',
+      'Declarative agent jobs as YAML in your vault under .zeromd/agents/. They run on a cron schedule, on save, on commit, on tag-add, or manually.',
     openWorkspace: 'Open a folder first — recipes live inside the vault.',
     list: 'Recipes',
     listEmpty: 'No recipes yet. Click "New recipe" to create one.',
@@ -1347,7 +1345,7 @@ export const en = {
     settingsHeading: 'Semantic search',
     enable: 'Enable semantic search (local RAG, ⌘⇧F)',
     enableHint:
-      'Off by default. When on, your notes are embedded locally into <workspace>/.solomd/embeddings.sqlite — no network, no model download needed for the bundled hashed-trigram backend. ⌘⇧F opens the panel.',
+      'Off by default. When on, your notes are embedded locally into <workspace>/.zeromd/embeddings.sqlite — no network, no model download needed for the bundled hashed-trigram backend. ⌘⇧F opens the panel.',
     statusReady: 'Indexed: {indexed} / {total} notes · {chunks} chunks · backend {backend}',
     statusEmpty: 'Not indexed yet — toggle on to build the index.',
     reindexNow: 'Re-index now',
@@ -1432,7 +1430,7 @@ export const en = {
     captureHeading: 'HTTP capture endpoint',
     enableCapture: 'Enable capture endpoint',
     enableCaptureHint:
-      'Off by default. When on, SoloMD listens on 127.0.0.1 (loopback only) for new-note POSTs from a browser extension, iOS Shortcut, shell script, or curl. Notes land in the workspace inbox folder with `inbox: true` in their YAML.',
+      'Off by default. When on, ZeroMD listens on 127.0.0.1 (loopback only) for new-note POSTs from a browser extension, iOS Shortcut, shell script, or curl. Notes land in the workspace inbox folder with `inbox: true` in their YAML.',
     endpoint: 'Endpoint',
     statusRunning: 'running',
     statusStarting: 'starting…',
@@ -1458,7 +1456,7 @@ export const en = {
       'Localhost-only HTTP surface that exposes the same vault tools as MCP. Useful for Alfred, Raycast, n8n, shell scripts, iOS Shortcuts — anything that does not speak MCP.',
     enable: 'Enable REST API',
     enableHint:
-      'Off by default. When on, SoloMD listens on 127.0.0.1 (loopback only). Every route except the public banner requires the bearer token below.',
+      'Off by default. When on, ZeroMD listens on 127.0.0.1 (loopback only). Every route except the public banner requires the bearer token below.',
     endpoint: 'Endpoint',
     statusRunning: 'running',
     statusStarting: 'starting…',
@@ -1485,7 +1483,7 @@ export const en = {
     close: 'Close',
     chooseTitle: 'Set up your AI assistant',
     chooseSub:
-      'SoloMD works without AI, but the agent panel and recipes need a model. Pick one path — you can change it any time in Settings → AI.',
+      'ZeroMD works without AI, but the agent panel and recipes need a model. Pick one path — you can change it any time in Settings → AI.',
     cloudTitle: 'Cloud (BYOK)',
     cloudBody:
       'Anthropic Claude, OpenAI ChatGPT, Google Gemini, DeepSeek, and 10+ more. Bring your own API key.',
@@ -1498,7 +1496,7 @@ export const en = {
     localDetecting: 'Looking for a running Ollama server…',
     localNotRunning: 'No Ollama server detected at localhost:11434.',
     localNotRunningHint:
-      'Install Ollama (~80 MB), launch it, then click Retry. SoloMD does not bundle Ollama.',
+      'Install Ollama (~80 MB), launch it, then click Retry. ZeroMD does not bundle Ollama.',
     localInstallBtn: 'Install Ollama',
     localRetryBtn: 'Retry detection',
     localRunningNoModel:
@@ -1534,7 +1532,7 @@ export const en = {
   cookbook: {
     heading: 'Recipe cookbook',
     intro:
-      'Pick a starter recipe — installing copies the YAML into .solomd/agents/ and opens it for you to edit. Safe to install multiple times; each install gets a fresh suffix.',
+      'Pick a starter recipe — installing copies the YAML into .zeromd/agents/ and opens it for you to edit. Safe to install multiple times; each install gets a fresh suffix.',
     browse: 'Browse cookbook',
     preview: 'Preview YAML',
     hidePreview: 'Hide preview',
@@ -1620,7 +1618,7 @@ export const en = {
     autoEngageFocusHint: 'Starting a Pomodoro flips focus mode on for the duration; ending the session restores your prior state.',
     defaultDuration: 'Default duration',
     customDurationLabel: 'Custom (minutes)',
-    notificationTitle: 'SoloMD — focus session complete',
+    notificationTitle: 'ZeroMD — focus session complete',
     notificationBody: '{minutes} min · {words} words written',
   },
   quickSwitcher: {
@@ -1690,7 +1688,7 @@ export const en = {
   cloudSync: {
     detectedTitle: 'Workspace is in {label}',
     detectedHint:
-      'Files saved here propagate automatically to your other devices via the cloud provider. SoloMD adds cross-device session restore on top — open the same workspace on another machine and the same tabs come back.',
+      'Files saved here propagate automatically to your other devices via the cloud provider. ZeroMD adds cross-device session restore on top — open the same workspace on another machine and the same tabs come back.',
     siblingCount: '{n} other device(s) have opened this workspace.',
     restoreTitle: 'Pick up where you left off?',
     restoreLead:
@@ -1708,7 +1706,7 @@ export const en = {
   githubSync: {
     heading: 'GitHub sync',
     intro:
-      'Push your vault to a private GitHub repo so it follows you across devices. Your data stays on your account — SoloMD just runs git push and git pull.',
+      'Push your vault to a private GitHub repo so it follows you across devices. Your data stays on your account — ZeroMD just runs git push and git pull.',
     signInTitle: 'Connect with GitHub',
     signInHint:
       'Paste a Personal Access Token. Stored in your OS keychain — never sent anywhere except api.github.com.',
@@ -1798,11 +1796,11 @@ export const en = {
     conflictResolveFailed: 'Resolution failed',
     keychainHintTitle: 'macOS will ask for your password — click "Always Allow"',
     keychainHintBody:
-      'The first time SoloMD pushes to GitHub, macOS pops a Keychain dialog so it can read your saved token. If End-to-end encryption is on, you\'ll see a second prompt for the encryption key. Click "Always Allow" (not just "Allow") on each — this whitelists SoloMD permanently and you\'ll never see the prompt again on this Mac. If you click "Allow" once, you\'ll be re-prompted every push.',
+      'The first time ZeroMD pushes to GitHub, macOS pops a Keychain dialog so it can read your saved token. If End-to-end encryption is on, you\'ll see a second prompt for the encryption key. Click "Always Allow" (not just "Allow") on each — this whitelists ZeroMD permanently and you\'ll never see the prompt again on this Mac. If you click "Allow" once, you\'ll be re-prompted every push.',
     proxyTitle: 'HTTPS proxy (for GFW / corporate networks)',
     proxyPlaceholder: 'http://127.0.0.1:7897 or socks5://127.0.0.1:1080',
     proxyHint:
-      'Routes git push / pull through this proxy. Leave empty for direct connect. macOS GUI apps don\'t inherit shell HTTPS_PROXY env, so set it here for SoloMD specifically. Also fixes "Operation timed out" when github.com is unreachable directly.',
+      'Routes git push / pull through this proxy. Leave empty for direct connect. macOS GUI apps don\'t inherit shell HTTPS_PROXY env, so set it here for ZeroMD specifically. Also fixes "Operation timed out" when github.com is unreachable directly.',
     proxySaveBtn: 'Save proxy',
     proxySaving: 'Saving…',
     proxySavedToast: 'Proxy saved.',
@@ -1822,7 +1820,7 @@ export const en = {
     upgradeRowBtn: 'Enable encryption',
     upgradeFormTitle: 'Enable end-to-end encryption',
     upgradeFormBody:
-      'Set a passphrase. SoloMD will derive a key (Argon2id) and re-encrypt every file before pushing again.',
+      'Set a passphrase. ZeroMD will derive a key (Argon2id) and re-encrypt every file before pushing again.',
     upgradeForcePushWarning:
       'This force-pushes the encrypted history over the remote — old plaintext commits become unreachable on GitHub. Anyone who already cloned this repo will need to re-clone. If you forget the passphrase, your data is unrecoverable.',
     upgradePassphrasePlaceholder: 'Vault passphrase (min 8 chars)',
@@ -1865,7 +1863,7 @@ export const en = {
       'Push your vault to a Gitea server. Enter your server URL and a Personal Access Token to get started.',
     giteaUrlTitle: 'Gitea server URL',
     giteaUrlHint:
-      'The base URL of your Gitea instance (e.g. https://gitea.com or your own server). SoloMD will append /api/v1 automatically.',
+      'The base URL of your Gitea instance (e.g. https://gitea.com or your own server). ZeroMD will append /api/v1 automatically.',
     giteaUrlValidateBtn: 'Validate URL',
     giteaUrlValidating: 'Validating...',
     giteaTokenTitle: 'Gitea Personal Access Token',

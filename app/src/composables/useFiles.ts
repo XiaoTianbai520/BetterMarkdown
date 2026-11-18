@@ -58,7 +58,7 @@ export function useFiles() {
   const windowsStore = useWindowsStore();
   const { t } = useI18n();
 
-  // #103 — spawn an auxiliary window with a *stable* label (`solomd-window-N`)
+  // #103 — spawn an auxiliary window with a *stable* label (`zeromd-window-N`)
   // instead of a timestamp, and record it in the shared windows registry so
   // (a) tauri-plugin-window-state can restore its geometry by label and
   // (b) the main window re-spawns it on the next launch. Returns the label,
@@ -72,7 +72,7 @@ export function useFiles() {
       // native chrome PLUS the in-app caption buttons Toolbar.vue renders.
       new WebviewWindow(label, {
         url,
-        title: 'SoloMD',
+        title: 'ZeroMD',
         width: 1000,
         height: 700,
         ...windowChromeOptions(),
@@ -87,7 +87,7 @@ export function useFiles() {
 
   async function newFile() {
     tabs.newTab();
-    window.dispatchEvent(new CustomEvent('solomd:file-opened', { detail: {} }));
+    window.dispatchEvent(new CustomEvent('zeromd:file-opened', { detail: {} }));
   }
 
   /**
@@ -115,7 +115,7 @@ export function useFiles() {
 
   async function newTextFile() {
     tabs.newTab({ fileName: 'Untitled.txt', language: 'plaintext' });
-    window.dispatchEvent(new CustomEvent('solomd:file-opened', { detail: {} }));
+    window.dispatchEvent(new CustomEvent('zeromd:file-opened', { detail: {} }));
   }
 
   async function openFile() {
@@ -146,7 +146,7 @@ export function useFiles() {
   // preview pane uses), not the document converter.
   const IMAGE_EXTENSIONS = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp']);
 
-  // Text / code files SoloMD opens natively as an editor tab. A Markdown link
+  // Text / code files ZeroMD opens natively as an editor tab. A Markdown link
   // to one of these always opens in-app, regardless of the
   // `openLinkedFilesExternally` setting (that setting only diverts non-text
   // documents like PDF / Office / audio to the OS default app). `md` is here
@@ -198,7 +198,7 @@ export function useFiles() {
       workspace.pushRecent(path);
       // 5.0 §8 — the phone shell moves to its editor screen on this (opening a
       // note that is already the active tab changes no store state).
-      window.dispatchEvent(new CustomEvent('solomd:file-opened', { detail: { path } }));
+      window.dispatchEvent(new CustomEvent('zeromd:file-opened', { detail: { path } }));
       toasts.success(t('toast.openedFile', { name: fileName }));
     } catch (e) {
       console.error('open image failed', e);
@@ -210,7 +210,7 @@ export function useFiles() {
    *  `content://` URIs, which neither std::fs nor our whole path-based stack
    *  can read (the raw URI reached fs::read and failed with os error 2).
    *  Import the bytes through the fs plugin's ContentResolver bridge into the
-   *  SoloMD Documents folder — mirroring what iOS does with Files-app opens —
+   *  ZeroMD Documents folder — mirroring what iOS does with Files-app opens —
    *  and hand back a real filesystem path for the rest of openPath. */
   async function importContentUri(uri: string): Promise<string> {
     const { readFile, exists } = await import('@tauri-apps/plugin-fs');
@@ -272,8 +272,8 @@ export function useFiles() {
 
     // #139 — normalize `file://` URLs to a plain filesystem path here, at the
     // single shared entry point. On iOS a Files-app open arrives via the
-    // `solomd://opened-file` channel as a raw, percent-encoded file URL
-    // (e.g. file:///private/var/.../tmp/app.solomd-Inbox/Markdown%20%E8%AF%AD….md)
+    // `zeromd://opened-file` channel as a raw, percent-encoded file URL
+    // (e.g. file:///private/var/.../tmp/app.zeromd-Inbox/Markdown%20%E8%AF%AD….md)
     // and was handed straight to Rust's fs::read, which then failed with
     // "No such file or directory" because the scheme + %-encoding made it a
     // bogus path. iOS already copied the file into our sandbox (readable), so
@@ -394,7 +394,7 @@ export function useFiles() {
       // 5.0 phone shell: opening a note shows the editor — also when it is the
       // tab that is already active (tapping the note you just backed out of),
       // which changes no store state for App.vue to notice.
-      window.dispatchEvent(new CustomEvent('solomd:file-opened', { detail: { path } }));
+      window.dispatchEvent(new CustomEvent('zeromd:file-opened', { detail: { path } }));
       // #148 / #168 — on a phone the tree is a drawer over the editor, so
       // close it once a file opens: picking a file means you want to read it.
       // Keyed off viewport width (not the UA) so a narrow desktop window
@@ -414,7 +414,7 @@ export function useFiles() {
    * non-image document (PDF, Office, audio, archives, unknown binaries) is
    * handed to the OS default app — matching the "click the link to open the
    * file" intuition users have from Typora / Obsidian. Markdown / text / code
-   * and images always stay inside SoloMD (editor tab / image overlay). When
+   * and images always stay inside ZeroMD (editor tab / image overlay). When
    * the setting is off, everything routes through `openPath` as before
    * (PDF/PPTX/EPUB → markitdown conversion).
    */
@@ -586,7 +586,7 @@ export function useFiles() {
     }
 
     if (imported.length && writeToDisk) {
-      window.dispatchEvent(new CustomEvent('solomd:saved', { detail: { filePath: imported[0] } }));
+      window.dispatchEvent(new CustomEvent('zeromd:saved', { detail: { filePath: imported[0] } }));
       // Open the first import so the result is visible rather than merely
       // reported — a summary toast alone leaves the user hunting in the tree.
       await openPath(imported[0], { bypassNewWindow: true });
@@ -676,7 +676,7 @@ export function useFiles() {
     // Open the OS folder picker rooted at the previously chosen workspace
     // so the user lands in a familiar tree, not at $HOME or wherever the
     // OS defaults. Without `defaultPath` Tauri's picker re-opens at the
-    // OS-level last-used directory, which is unrelated to SoloMD state
+    // OS-level last-used directory, which is unrelated to ZeroMD state
     // and surprised users with a "why isn't my last folder remembered"
     // bug. We persist `currentFolder` already; this just feeds it back —
     // via pickerStartDir(), which guarantees the folder it hands over
@@ -687,14 +687,14 @@ export function useFiles() {
     // directory-tree picker on Android, so the button looked dead. Mirror
     // iOS behaviour and pin the workspace to the app's Documents dir.
     // The user can drop .md files into that folder via the Files app
-    // ("On My Device > SoloMD"); SoloMD reads them back on next open.
+    // ("On My Device > ZeroMD"); ZeroMD reads them back on next open.
     // #139 — neither Android nor iOS surfaces a usable OS folder picker
     // through Tauri's dialog plugin (`openDialog({directory:true})` resolves to
     // null), so the "Open Folder" button looked dead on both. Mirror the
     // Android behaviour on iOS: pin the workspace to the app's own Documents
-    // dir ("On My iPhone/iPad › SoloMD" via UIFileSharingEnabled). Users drop
+    // dir ("On My iPhone/iPad › ZeroMD" via UIFileSharingEnabled). Users drop
     // .md files there through the Files app and they show up in the tree.
-    // #148 / #151 — Android: with all-files access the user can point SoloMD
+    // #148 / #151 — Android: with all-files access the user can point ZeroMD
     // at a REAL vault folder anywhere on shared storage (…/Documents, a
     // Syncthing/Dropbox dir) and edit in place, instead of being stuck with
     // the unreachable /Android/data sandbox. Check the permission; if missing,
@@ -711,17 +711,17 @@ export function useFiles() {
         // Launch and mark that a pick is in flight; App.vue resolves the result
         // on resume (the picker backgrounds our WebView, so we can't await it
         // inline — the JS poll loop is lost across the transition).
-        localStorage.setItem('solomd:saf-picking', '1');
+        localStorage.setItem('zeromd:saf-picking', '1');
         await safLaunchPicker();
       } catch (e) {
-        localStorage.removeItem('solomd:saf-picking');
+        localStorage.removeItem('zeromd:saf-picking');
         toasts.error(String(e));
       }
       return;
     }
     if (isIOS()) {
       // The system folder picker (src-tauri/src/ios_folder.rs): any folder —
-      // iCloud Drive, another app's folder, or "On My iPhone › SoloMD" — with
+      // iCloud Drive, another app's folder, or "On My iPhone › ZeroMD" — with
       // its security scope opened and remembered across launches. Cancelling
       // changes nothing; only if the picker cannot be shown at all do we fall
       // back to the app's own folder, as before.
@@ -757,7 +757,7 @@ export function useFiles() {
   // iOS save policy: ignore the in-place path (could be a security-scoped
   // URL from a "Open With" deep-link — unwritable from plain Rust fs) and
   // route everything through the app's own Documents directory. With
-  // UIFileSharingEnabled set, that folder appears as "On My iPhone › SoloMD"
+  // UIFileSharingEnabled set, that folder appears as "On My iPhone › ZeroMD"
   // in the Files app, so users can iCloud-sync or move from there.
   async function iosResolvePath(tab: Tab): Promise<string> {
     const fname =
@@ -834,7 +834,7 @@ export function useFiles() {
     // read a stale document; for `:wq` the tab then closes and the tail of the
     // edit is silently lost. Editors flush their pending sync synchronously on
     // this event, so `tab.content` below is current.
-    window.dispatchEvent(new Event('solomd:flush-content-sync'));
+    window.dispatchEvent(new Event('zeromd:flush-content-sync'));
     let path = tab.filePath;
     let iosCopy = false;
     if (isIOS()) {
@@ -886,7 +886,7 @@ export function useFiles() {
         // v2.2: notify the AutoGit composable so the debounced auto-commit
         // pipeline picks up this save. Listener is in `useAutoCommit.ts`.
         window.dispatchEvent(
-          new CustomEvent('solomd:saved', { detail: { filePath: path } }),
+          new CustomEvent('zeromd:saved', { detail: { filePath: path } }),
         );
       }
       if (!opts.silent) {
@@ -971,7 +971,7 @@ export function useFiles() {
       // v2.5: feed the ⌘P quick-switcher's MFU ranking.
       recentEdits.recordEdit(path);
       window.dispatchEvent(
-        new CustomEvent('solomd:saved', { detail: { filePath: path } }),
+        new CustomEvent('zeromd:saved', { detail: { filePath: path } }),
       );
       const fileName = path.split(/[\\/]/).pop() ?? path;
       toasts.success(isIOS() ? t('toast.savedToIos', { name: fileName }) : t('toast.savedAs', { name: fileName }));
@@ -1000,7 +1000,7 @@ export function useFiles() {
     if (!settings.autoSaveOnBlur) return;
     // The editor reaches tab.content ~350 ms late; without this flush a blur
     // right after typing saved the file minus its last keystrokes.
-    window.dispatchEvent(new Event('solomd:flush-content-sync'));
+    window.dispatchEvent(new Event('zeromd:flush-content-sync'));
     for (const tab of tabs.tabs) {
       if (tab.filePath && tabs.isDirty(tab.id)) {
         await saveTab(tab, { silent: true });
@@ -1018,7 +1018,7 @@ export function useFiles() {
   function getUnsavedDialog(): UnsavedDialog | undefined {
     if (injectedDialog) return injectedDialog;
     const w = window as any;
-    return w.__solomd_showUnsavedDialog as UnsavedDialog | undefined;
+    return w.__zeromd_showUnsavedDialog as UnsavedDialog | undefined;
   }
 
   async function closeTabSafe(id: string) {
@@ -1028,7 +1028,7 @@ export function useFiles() {
     // tab.content, which lags the CodeMirror doc by up to 350ms. A close
     // landing inside that window (vim `:q`, fast Ctrl+W) saw a clean tab and
     // discarded the unsynced tail without the unsaved-changes dialog.
-    window.dispatchEvent(new Event('solomd:flush-content-sync'));
+    window.dispatchEvent(new Event('zeromd:flush-content-sync'));
     const showUnsavedDialog = getUnsavedDialog();
     if (tab.content !== tab.savedContent && showUnsavedDialog) {
       const action = await showUnsavedDialog('tab', tab.fileName, 1);

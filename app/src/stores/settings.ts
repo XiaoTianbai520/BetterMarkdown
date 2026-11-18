@@ -9,7 +9,7 @@ import {
   migrateQuickCaptureShortcut,
 } from '../lib/quick-capture-shortcut';
 
-const LS_KEY = 'solomd.settings.v1';
+const LS_KEY = 'zeromd.settings.v1';
 
 // CJK + generic fallback appended after the user's chosen face. This way
 // Latin glyphs come from the user's pick while CJK still falls back to
@@ -71,7 +71,7 @@ interface Settings {
   highlightCurrentLine: boolean;
   /** Use the document's first non-empty line as the tab title instead of the
    *  on-disk filename (off by default). Useful when a 3rd-party tool opens
-   *  temporary/UUID-named files in SoloMD. */
+   *  temporary/UUID-named files in ZeroMD. */
   tabTitleFromFirstLine: boolean;
   /** #484 — automatically maintain hierarchical 1–6 heading numbers (`1.`, `1.1`, `1.1.1`)
    *  when headings are added, deleted, or modified (off by default). */
@@ -104,7 +104,7 @@ interface Settings {
   // isn't squeezed into an unreadable sliver.
   v491MobileLayoutMigrated: boolean;
   /** v4.6 F5 — show the Saved Views panel (left sidebar, below the file tree).
-   *  Lists persistent filtered note lists from `.solomd/views/*.yml`. Default
+   *  Lists persistent filtered note lists from `.zeromd/views/*.yml`. Default
    *  off so the panel only appears once the user opts in / creates a view. */
   showViewsPanel: boolean;
   /** Master toggle that hides the right side sidebar (Outline / Backlinks /
@@ -140,7 +140,6 @@ interface Settings {
   windowsEditorEngineExplicit: boolean;
   uiFontSize: number;
   language: 'auto' | 'en' | 'zh';
-  autoCheckUpdate: boolean;
   // Preview layout
   previewFitWidth: boolean;
   /** v4.10 issue #165 — preview/reading content column width in px (was a
@@ -156,12 +155,6 @@ interface Settings {
   // #109 — constrain the editor pane to a centered readable column instead of
   // letting long lines stretch the full window width.
   limitEditorWidth: boolean;
-  // Custom CSS theme override (path to a .css file on disk)
-  customCssPath: string;
-  // Anonymous telemetry (Aptabase). Defaults true but user can opt out.
-  telemetryEnabled: boolean;
-  // First-run banner dismissal. Shown once, never again.
-  telemetryNoticeAck: boolean;
   // Restore previously-open tabs + pane layout at startup (default: true).
   restoreSession: boolean;
   // Scope open tabs to the active workspace folder (default: true). Each
@@ -170,7 +163,7 @@ interface Settings {
   // don't clobber one shared tab blob. Unsaved + untitled tabs always follow
   // the user across workspaces so no in-progress work is lost.
   perWorkspaceTabs: boolean;
-  // When a file watched by SoloMD is modified by another program (other
+  // When a file watched by ZeroMD is modified by another program (other
   // editor, git checkout, sync client), reload the buffer automatically
   // if the tab has no unsaved changes. Default on. Dirty tabs always
   // show the reload/overwrite/cancel dialog regardless of this setting —
@@ -266,7 +259,7 @@ interface Settings {
    *  splitter the touched panes get explicit pixel heights. */
   rightSidebarPaneHeights: Record<string, number>;
   // v2.3: Local RAG / semantic search. Off by default — when on, the
-  // workspace is scanned + embedded into <workspace>/.solomd/embeddings.sqlite.
+  // workspace is scanned + embedded into <workspace>/.zeromd/embeddings.sqlite.
   ragEnabled: boolean;
   // v2.4: when on, opening any tab on iPad / iPhone snaps view mode to
   // `reading` (no editor chrome — just the rendered prose). Defaults to
@@ -309,11 +302,6 @@ interface Settings {
   // the keyboard interception.
   slashCommandsEnabled: boolean;
   fenceLanguageSuggestions: boolean;
-  // v3.6: PNG export — show "Created with SoloMD · solomd.app" footer
-  // under the rendered note. Default ON (mild self-promotion is fine
-  // for a free MIT app), but explicitly toggleable in Settings → Export
-  // for users who don't want the watermark on screenshots they share.
-  imageExportBranding: boolean;
   // v4.3.0: global UI zoom (scales the entire app — editor, preview, chrome,
   // sidebars, modals). Helpful on high-DPI screens where everything renders
   // too small even at the OS default scale. Range 0.75x – 2.5x. Wired via
@@ -450,7 +438,7 @@ interface Settings {
   // is a pane id (search / outline / backlinks / tags / history / agent).
   // Default matches the pre-v4.3.0 hardcoded order. Panes not in the list
   // (newly added in a future release) get appended to the end so the user's
-  // saved layout isn't blown away by a SoloMD update. Issue #57b.
+  // saved layout isn't blown away by a ZeroMD update. Issue #57b.
   rsPaneOrder: string[];
   // v4.3.0: preview-pane font size (px). Decoupled from editor `fontSize`
   // so users can tune editor density and preview readability separately
@@ -672,7 +660,6 @@ function defaults(): Settings {
     windowsEditorEngine: 'auto',
     windowsEditorEngineExplicit: false,
     uiFontSize: 13,
-    autoCheckUpdate: true,
     language: (() => {
       try {
         const nav = typeof navigator !== 'undefined' ? navigator.language || '' : '';
@@ -685,9 +672,6 @@ function defaults(): Settings {
     plantumlEnabled: false,
     plantumlServer: 'https://www.plantuml.com/plantuml',
     limitEditorWidth: true,
-    customCssPath: '',
-    telemetryEnabled: true,
-    telemetryNoticeAck: false,
     restoreSession: true,
     perWorkspaceTabs: true,
     autoReloadExternalChanges: true,
@@ -739,7 +723,7 @@ function defaults(): Settings {
     webdavUrl: '',
     webdavUsername: '',
     webdavPassword: '',
-    webdavRemotePath: '/SoloMD',
+    webdavRemotePath: '/ZeroMD',
     showWritingStats: true,
     showWorkspaceDailyTotal: false,
     pdfDefaults: defaultPdfDefaults(),
@@ -748,7 +732,6 @@ function defaults(): Settings {
     pomodoroDefaultMinutes: 25,
     slashCommandsEnabled: true,
     fenceLanguageSuggestions: true,
-    imageExportBranding: true,
     globalZoom: 1,
     wheelZoomEnabled: true,
     quickCaptureEnabled: true,
@@ -867,7 +850,7 @@ function stringList(v: unknown): string[] {
 }
 
 /** Fired after any LanguageTool setting changes, so open editors re-check. */
-export const LT_SETTINGS_CHANGED_EVENT = 'solomd:languagetool-settings-changed';
+export const LT_SETTINGS_CHANGED_EVENT = 'zeromd:languagetool-settings-changed';
 
 function load(): Settings {
   try {
@@ -1349,18 +1332,6 @@ export const useSettingsStore = defineStore('settings', {
       this.windowsEditorEngineExplicit = this.windowsEditorEngine !== 'auto';
       this.persist();
     },
-    toggleAutoCheckUpdate() {
-      this.autoCheckUpdate = !this.autoCheckUpdate;
-      this.persist();
-    },
-    toggleTelemetry() {
-      this.telemetryEnabled = !this.telemetryEnabled;
-      this.persist();
-    },
-    ackTelemetryNotice() {
-      this.telemetryNoticeAck = true;
-      this.persist();
-    },
     toggleRestoreSession() {
       this.restoreSession = !this.restoreSession;
       this.persist();
@@ -1541,7 +1512,7 @@ export const useSettingsStore = defineStore('settings', {
       this.sideSidebarWidth = d.sideSidebarWidth;
       this.persist();
     },
-    /** The view.resetSidebarPanes command's entry point (useCommands.ts). */
+    /** Clears stored sidebar pane heights. */
     clearRightSidebarPaneHeights() {
       this.resetRightSidebarLayout();
     },
@@ -1555,10 +1526,6 @@ export const useSettingsStore = defineStore('settings', {
     },
     setLanguage(lang: 'auto' | 'en' | 'zh') {
       this.language = lang;
-      this.persist();
-    },
-    setCustomCssPath(p: string) {
-      this.customCssPath = p;
       this.persist();
     },
     togglePreviewFitWidth() {
@@ -1613,10 +1580,6 @@ export const useSettingsStore = defineStore('settings', {
     },
     toggleFenceLanguageSuggestions() {
       this.fenceLanguageSuggestions = !this.fenceLanguageSuggestions;
-      this.persist();
-    },
-    toggleImageExportBranding() {
-      this.imageExportBranding = !this.imageExportBranding;
       this.persist();
     },
     setGlobalZoom(n: number) {

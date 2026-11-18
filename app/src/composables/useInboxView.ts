@@ -8,8 +8,8 @@
  * off-limits store.
  *
  * Events:
- *   - `solomd:open-inbox`  → show InboxView
- *   - `solomd:close-inbox` → hide InboxView (back to the editor)
+ *   - `zeromd:open-inbox`  → show InboxView
+ *   - `zeromd:close-inbox` → hide InboxView (back to the editor)
  */
 
 export interface UseInboxView {
@@ -19,8 +19,8 @@ export interface UseInboxView {
   closeInbox(): void;
 }
 
-export const INBOX_OPEN_EVENT = 'solomd:open-inbox';
-export const INBOX_CLOSE_EVENT = 'solomd:close-inbox';
+export const INBOX_OPEN_EVENT = 'zeromd:open-inbox';
+export const INBOX_CLOSE_EVENT = 'zeromd:close-inbox';
 
 export function useInboxView(): UseInboxView {
   function openInbox() {

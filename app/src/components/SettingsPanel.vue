@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue';
 import { getVersion } from '@tauri-apps/api/app';
-import { openUrl } from '@tauri-apps/plugin-opener';
 import { useSettingsStore } from '../stores/settings';
 import { useI18n } from '../i18n';
 import { DsModal } from '../ui';
@@ -41,9 +40,6 @@ onMounted(async () => {
   }
 });
 
-function openGithub() {
-  openUrl('https://github.com/solomd-app/solomd').catch(() => {});
-}
 </script>
 
 <template>
@@ -229,7 +225,7 @@ function openGithub() {
           <div class="about-logo">
             <BrandMark :size="48" />
           </div>
-          <h2 class="about-title">SoloMD</h2>
+          <h2 class="about-title">ZeroMD</h2>
           <div class="about-version">版本 v{{ version }} (Android 专属轻量版)</div>
           <p class="about-desc">
             触控优先的 Android 单文档 Markdown 编辑器。<br />
@@ -244,11 +240,11 @@ function openGithub() {
               <span class="meta-label">存储适配</span>
               <span class="meta-val">Android SAF & 本地文件系统</span>
             </div>
+            <div class="about-meta-row">
+              <span class="meta-label">开源协议</span>
+              <span class="meta-val">MIT License</span>
+            </div>
           </div>
-          <button type="button" class="about-link-btn" @click="openGithub">
-            <Icons name="globe" :size="16" />
-            <span>GitHub 仓库</span>
-          </button>
         </section>
       </div>
     </div>

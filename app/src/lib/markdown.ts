@@ -182,7 +182,7 @@ md.inline.ruler.before('link', 'wikilink', (state, silent) => {
 
 // ---- Image with a space in its path (#345) -----------------------------------
 // CommonMark doesn't allow a space in a bare link destination, so
-// `![](D:/Program Files/a.png)` renders as literal text. SoloMD used to write
+// `![](D:/Program Files/a.png)` renders as literal text. ZeroMD used to write
 // exactly that when pasting into an image folder whose path had a space (it
 // now percent-encodes, see md-image-url.ts), so notes in the wild still carry
 // such links. Accept them as images — but only when the destination is a
@@ -424,7 +424,7 @@ function parseForToc(state: any, source: string): any[] {
   // capture with the full document's front matter.
   const savedFrontMatter = lastFrontMatterRaw;
   try {
-    return state.md.parse(source, { solomdTocScan: true });
+    return state.md.parse(source, { zeromdTocScan: true });
   } finally {
     lastFrontMatterRaw = savedFrontMatter;
   }
@@ -452,7 +452,7 @@ function tocListTokens(state: any, headings: TocHeading[]): any[] {
 
 md.core.ruler.before('source_line_map', 'table_of_contents', (state) => {
   const env = (state.env || {}) as Record<string, unknown>;
-  if (env.solomdTocScan === true) return;
+  if (env.zeromdTocScan === true) return;
 
   const sourceLines = state.src.split('\n');
   const markers: number[] = [];
@@ -475,7 +475,7 @@ md.core.ruler.before('source_line_map', 'table_of_contents', (state) => {
   }
   if (!markers.length) return;
 
-  const externalSource = env.solomdTocSource;
+  const externalSource = env.zeromdTocSource;
   const headingTokens =
     typeof externalSource === 'string' ? parseForToc(state, externalSource) : state.tokens;
   const headings = tocHeadingsFromTokens(headingTokens);
@@ -1302,7 +1302,7 @@ export function renderMarkdown(
   const normalized = preprocessMarkdown(source);
   const env: Record<string, unknown> = {};
   if (options?.tocSource !== undefined) {
-    env.solomdTocSource = preprocessMarkdown(options.tocSource);
+    env.zeromdTocSource = preprocessMarkdown(options.tocSource);
   }
   const prevBreaks = md.options.breaks;
   if (options?.breaks !== undefined) md.set({ breaks: options.breaks });

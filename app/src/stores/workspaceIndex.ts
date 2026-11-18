@@ -9,7 +9,7 @@
  *   - Bases (F6) → properties table
  *
  * Whenever the workspace folder changes (workspace store), we re-init the
- * Rust index. The Rust side emits `solomd://index-updated` after every
+ * Rust index. The Rust side emits `zeromd://index-updated` after every
  * mutation; we listen and refresh our cached `entries` array.
  */
 import { defineStore } from 'pinia';
@@ -83,7 +83,7 @@ interface State {
   folder: string | null;
   /** Whether the Rust index has been initialized for the current folder. */
   ready: boolean;
-  /** Cached files list. Refreshed on `solomd://index-updated`. */
+  /** Cached files list. Refreshed on `zeromd://index-updated`. */
   entries: IndexEntry[];
   /** Cached tag counts. */
   tags: TagCount[];
@@ -139,7 +139,7 @@ export const useWorkspaceIndexStore = defineStore('workspaceIndex', {
         await invoke<number>('workspace_index_init', { folder });
         await this.refresh();
         if (!unlistenIndex) {
-          unlistenIndex = await listen('solomd://index-updated', () => {
+          unlistenIndex = await listen('zeromd://index-updated', () => {
             this.refresh().catch(() => {});
           });
         }

@@ -7,7 +7,7 @@ fn tmp_file(name: &str) -> String {
 
 #[test]
 fn read_utf8_with_bom() {
-    let path = tmp_file("solomd-utf8-bom.md");
+    let path = tmp_file("zeromd-utf8-bom.md");
     let mut bytes = vec![0xEF, 0xBB, 0xBF];
     bytes.extend_from_slice("# Hello 世界".as_bytes());
     fs::write(&path, &bytes).unwrap();
@@ -21,7 +21,7 @@ fn read_utf8_with_bom() {
 
 #[test]
 fn read_utf8_no_bom() {
-    let path = tmp_file("solomd-utf8.md");
+    let path = tmp_file("zeromd-utf8.md");
     fs::write(&path, "# Plain UTF-8\n中文测试").unwrap();
 
     let r = read_file(path).unwrap();
@@ -33,9 +33,9 @@ fn read_utf8_no_bom() {
 #[test]
 fn read_gbk_chinese() {
     use encoding_rs::GBK;
-    let path = tmp_file("solomd-gbk.txt");
+    let path = tmp_file("zeromd-gbk.txt");
     let text = "中文软件开发笔记。这是一段用 GBK 编码保存的中文文本，\
-                用来验证 SoloMD 的编码识别功能能否正确把它读回来并\
+                用来验证 ZeroMD 的编码识别功能能否正确把它读回来并\
                 转成 UTF-8 显示。Markdown 编辑器的关键特性之一就是\
                 老旧编码的兼容支持。再加一行内容来确保字节数足够。";
     let (gbk_bytes, _, _) = GBK.encode(text);
@@ -50,7 +50,7 @@ fn read_gbk_chinese() {
 
 #[test]
 fn read_utf16_le_bom() {
-    let path = tmp_file("solomd-utf16le.md");
+    let path = tmp_file("zeromd-utf16le.md");
     let mut bytes = vec![0xFF, 0xFE]; // UTF-16 LE BOM
     for ch in "# UTF16 LE".encode_utf16() {
         bytes.push((ch & 0xFF) as u8);
@@ -66,7 +66,7 @@ fn read_utf16_le_bom() {
 
 #[test]
 fn write_then_read_utf8_roundtrip() {
-    let path = tmp_file("solomd-roundtrip.md");
+    let path = tmp_file("zeromd-roundtrip.md");
     let original = "# Round Trip\n你好 World!".to_string();
     write_file(path.clone(), original.clone(), "UTF-8".to_string()).unwrap();
 
@@ -76,7 +76,7 @@ fn write_then_read_utf8_roundtrip() {
 
 #[test]
 fn write_gbk_roundtrip() {
-    let path = tmp_file("solomd-gbk-rt.txt");
+    let path = tmp_file("zeromd-gbk-rt.txt");
     let original = "你好世界".to_string();
     write_file(path.clone(), original.clone(), "GBK".to_string()).unwrap();
 
@@ -86,17 +86,17 @@ fn write_gbk_roundtrip() {
 
 #[test]
 fn detect_language_from_extension() {
-    let path = tmp_file("solomd-lang.markdown");
+    let path = tmp_file("zeromd-lang.markdown");
     fs::write(&path, "# heading").unwrap();
     let r = read_file(path).unwrap();
     assert_eq!(r.language, "markdown");
 
-    let path2 = tmp_file("solomd-lang.txt");
+    let path2 = tmp_file("zeromd-lang.txt");
     fs::write(&path2, "plain").unwrap();
     let r2 = read_file(path2).unwrap();
     assert_eq!(r2.language, "plaintext");
 
-    let path3 = tmp_file("solomd-lang.rs");
+    let path3 = tmp_file("zeromd-lang.rs");
     fs::write(&path3, "fn main(){}").unwrap();
     let r3 = read_file(path3).unwrap();
     assert_eq!(r3.language, "plaintext");

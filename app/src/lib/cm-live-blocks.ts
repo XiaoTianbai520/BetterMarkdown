@@ -116,7 +116,7 @@ let relayoutTimer: ReturnType<typeof setTimeout> | null = null;
 // them (see the `deps` field on each) remount with the real output.
 onRenderDepsChange(() => {
   try {
-    window.dispatchEvent(new CustomEvent('solomd:cm-relayout'));
+    window.dispatchEvent(new CustomEvent('zeromd:cm-relayout'));
   } catch {}
 });
 
@@ -125,7 +125,7 @@ function scheduleImageRelayout(): void {
   relayoutTimer = setTimeout(() => {
     relayoutTimer = null;
     try {
-      window.dispatchEvent(new CustomEvent('solomd:cm-relayout'));
+      window.dispatchEvent(new CustomEvent('zeromd:cm-relayout'));
     } catch {}
   }, 50);
 }
@@ -204,8 +204,8 @@ class ImageWidget extends WidgetType {
     img.draggable = false;
     if (this.width) img.style.width = this.width;
     if (this.height) img.style.height = this.height;
-    if (this.lineNumber > 0) img.dataset.solomdLine = String(this.lineNumber);
-    if (this.localPath) img.dataset.solomdLocalSrc = this.localPath;
+    if (this.lineNumber > 0) img.dataset.zeromdLine = String(this.lineNumber);
+    if (this.localPath) img.dataset.zeromdLocalSrc = this.localPath;
     img.onerror = () => {
       // Image failed to load — fall back to a small "broken image" caption
       // rather than a giant empty box. The source text is one cursor-move
@@ -310,7 +310,7 @@ class HtmlBlockWidget extends WidgetType {
     );
     if (this.lineNumber > 0) {
       for (const img of Array.from(wrap.querySelectorAll('img'))) {
-        img.dataset.solomdLine = String(this.lineNumber);
+        img.dataset.zeromdLine = String(this.lineNumber);
       }
     }
     installSvgImageFallbacks(wrap);
@@ -490,7 +490,7 @@ function inlineMathSpans(text: string): Array<{ start: number; end: number; tex:
 
 // v4.3.0 issue #57a — mermaid fenced blocks. Mermaid is async so we render
 // into a module-level cache; toDOM() pulls the SVG when available, falls
-// back to a "rendering…" placeholder, then dispatches `solomd:cm-relayout`
+// back to a "rendering…" placeholder, then dispatches `zeromd:cm-relayout`
 // to ask the editor to rebuild decorations once the cache fills.
 // v4.10 issue #163 — ```plantuml fence rendered via the configured PlantUML
 // server (opt-in; see lib/plantuml.ts for the privacy story). Same reveal
@@ -518,14 +518,14 @@ class PlantumlWidget extends WidgetType {
     img.src = this.url;
     img.addEventListener('load', () => {
       try {
-        window.dispatchEvent(new CustomEvent('solomd:cm-relayout'));
+        window.dispatchEvent(new CustomEvent('zeromd:cm-relayout'));
       } catch {}
     });
     img.addEventListener('error', () => {
       wrap.classList.add('cm-live-block--broken');
       wrap.textContent = 'PlantUML render failed — check the server setting';
       try {
-        window.dispatchEvent(new CustomEvent('solomd:cm-relayout'));
+        window.dispatchEvent(new CustomEvent('zeromd:cm-relayout'));
       } catch {}
     });
     wrap.appendChild(img);
@@ -902,7 +902,7 @@ function buildBlockDecorations(state: EditorState, opts: BlockOptions): Decorati
  * Live-render of standalone images / tables / block-math / Mermaid in the
  * WYSIWYG "live edit" mode. Returns a StateField (block decorations are not
  * allowed from view plugins) plus a companion view plugin that turns the
- * async-Mermaid `solomd:cm-relayout` window event into a field recompute.
+ * async-Mermaid `zeromd:cm-relayout` window event into a field recompute.
  */
 export function liveBlocksExtension(opts: BlockOptions = {}) {
   const field = StateField.define<DecorationSet>({
@@ -928,7 +928,7 @@ export function liveBlocksExtension(opts: BlockOptions = {}) {
   });
 
   // Mermaid renders asynchronously; when its SVG cache fills, the widget
-  // fires `solomd:cm-relayout`. Translate that into a `relayoutEffect` so the
+  // fires `zeromd:cm-relayout`. Translate that into a `relayoutEffect` so the
   // field rebuilds and the widget remounts with the finished SVG.
   const relayout = ViewPlugin.fromClass(
     class {
@@ -937,10 +937,10 @@ export function liveBlocksExtension(opts: BlockOptions = {}) {
         this.onRelayout = () => {
           view.dispatch({ effects: relayoutEffect.of(null) });
         };
-        window.addEventListener('solomd:cm-relayout', this.onRelayout);
+        window.addEventListener('zeromd:cm-relayout', this.onRelayout);
       }
       destroy() {
-        window.removeEventListener('solomd:cm-relayout', this.onRelayout);
+        window.removeEventListener('zeromd:cm-relayout', this.onRelayout);
       }
     },
   );

@@ -1,7 +1,6 @@
 pub mod commands;
 pub mod saf_android;
 pub mod search;
-pub mod storage_android;
 pub mod watcher;
 pub mod workspace_index;
 
@@ -32,9 +31,6 @@ pub fn run() {
             commands::fs_list_dirs,
             commands::fs_list_extensions,
             commands::fs_dirs_with_extensions,
-            commands::webview_runtime_version,
-            commands::update_frontmatter_property,
-            commands::delete_frontmatter_property,
             search::search_in_dir,
             // Android SAF
             saf_android::saf_pick_folder,
@@ -48,11 +44,6 @@ pub fn run() {
             saf_android::saf_write,
             saf_android::saf_create,
             saf_android::saf_delete,
-            // Android storage permissions
-            storage_android::android_has_all_files_access,
-            storage_android::android_request_all_files_access,
-            storage_android::android_system_insets,
-            storage_android::android_restart_app,
             // Watcher
             watcher::watch_file,
             watcher::unwatch_file,

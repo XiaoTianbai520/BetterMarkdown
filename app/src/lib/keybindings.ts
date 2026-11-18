@@ -117,7 +117,7 @@ function activeActionById(actionId: string, platform: 'mac' | 'windows' | 'linux
  * defaults are byte-for-byte what shipped before.
  */
 export const KEY_ACTIONS: KeyActionDef[] = [
-  // Grouped and ordered as the menu bar is (lib/app-menu.ts), so Settings ›
+  // Grouped by area, matching the settings UI, so Settings ›
   // Shortcuts reads like the menus it rebinds — a tester's review (bug/,
   // 2026-10-07) found a 工具 group no menu had.
 
@@ -453,7 +453,7 @@ export function combosFor(
 }
 
 /**
- * Chords another program takes over before SoloMD can see them.
+ * Chords another program takes over before ZeroMD can see them.
  *
  * Reported from a Windows 10 machine with an AMD card (2026-09-20): AMD
  * Software's global hotkeys swallow most of the Ctrl+Shift row, so those
@@ -769,7 +769,7 @@ export function conflictFor(
   return null;
 }
 
-// The native menu's accelerators come from lib/app-menu.ts (`toNativeSpec`),
+// The native menu's accelerators come from the menu definition,
 // which reads the same bindings for every item — bug/C1 replaced the per-item
 // override table that used to live here.
 

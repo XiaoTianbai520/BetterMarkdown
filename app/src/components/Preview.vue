@@ -4,7 +4,6 @@ import { openRenderedLink } from '../lib/link-open';
 import { renderMarkdown, extractImageRoot } from '../lib/markdown';
 import { togglePreviewTask } from '../lib/preview-task-toggle';
 import { useRenderDepsVersion } from '../composables/useRenderDepsVersion';
-import { plantumlSvgUrl } from '../lib/plantuml';
 import { installSvgImageFallbacks, rewriteImageUrls } from '../lib/image-resolve';
 import { openImageOverlay, type OverlayStrings } from '../lib/image-overlay';
 import { useToastsStore } from '../stores/toasts';
@@ -153,7 +152,7 @@ function onTaskCheckboxClick(e: MouseEvent) {
   const dataLine = Number(li?.getAttribute('data-line') || 0);
   // The editor syncs into the store on a debounce; flush first so the toggle
   // is applied to what is on screen, not to text a few keystrokes old.
-  window.dispatchEvent(new Event('solomd:flush-content-sync'));
+  window.dispatchEvent(new Event('zeromd:flush-content-sync'));
   const tab = tabs.tabs.find((x) => x.id === props.tabId);
   const next = togglePreviewTask(tab?.content ?? props.source ?? '', dataLine, all.indexOf(box), wasChecked);
   if (next === null) {
@@ -186,38 +185,6 @@ const html = computed(() => {
   const source = props.source || '';
   return rewriteImageUrls(renderMarkdown(source), extractImageRoot(source), props.filePath);
 });
-
-// v4.10 issue #163 — render ```plantuml fences through the configured
-// PlantUML server. Opt-in (`plantumlEnabled`); when off the fence stays a
-// plain code block. Display is an <img> (no fetch → no CORS); onerror keeps
-// the source visible with a hint instead of a broken image.
-function processPlantuml() {
-  if (!host.value) return;
-  if (!settings.plantumlEnabled || !settings.plantumlServer) return;
-  const blocks = host.value.querySelectorAll(
-    'pre > code.language-plantuml, pre > code.language-puml',
-  );
-  for (const block of Array.from(blocks)) {
-    const pre = block.parentElement as HTMLElement | null;
-    if (!pre || pre.dataset.rendered === '1') continue;
-    const code = (block.textContent || '').trim();
-    const wrap = document.createElement('div');
-    wrap.className = 'plantuml-block';
-    const img = document.createElement('img');
-    img.alt = 'PlantUML diagram';
-    img.loading = 'lazy';
-    img.src = plantumlSvgUrl(settings.plantumlServer, code);
-    img.addEventListener('error', () => {
-      const err = document.createElement('pre');
-      err.className = 'plantuml-error';
-      err.textContent = `PlantUML render failed (${settings.plantumlServer})\n\n${code}`;
-      wrap.replaceWith(err);
-    });
-    wrap.appendChild(img);
-    pre.replaceWith(wrap);
-  }
-}
-
 
 // The theme is applied by processMermaid on each render pass. Diagrams already
 // on screen were drawn for the old theme and processMermaid skips them, so put
@@ -331,33 +298,15 @@ watch(html, async () => {
   if (activeTabId && restoringTabScroll) {
     restoreTabScroll(activeTabId);
   }
-  processPlantuml();
   attachImageOverlayHandlers();
   attachCodeCopyButtons();
   enableTaskCheckboxes();
 });
 
-// Toggling PlantUML (or changing the server) must re-render: the markdown
-// HTML string itself is unchanged (PlantUML swaps happen post-render), so
-// v-html would not reset the DOM on its own. Rebuild from html and re-run
-// the processors.
-watch(
-  () => [settings.plantumlEnabled, settings.plantumlServer],
-  async () => {
-    if (!host.value) return;
-    host.value.innerHTML = html.value;
-    await nextTick();
-    processPlantuml();
-    attachImageOverlayHandlers();
-    attachCodeCopyButtons();
-    enableTaskCheckboxes();
-  },
-);
-
 /**
  * Intercept all link clicks inside the preview pane and open them in the
  * system browser instead of navigating the Tauri webview (which would
- * replace the SoloMD UI with the target page). Shared with the Windows
+ * replace the ZeroMD UI with the target page). Shared with the Windows
  * live-edit blocks — see lib/link-open.
  */
 function handleLinkClick(e: MouseEvent) {
@@ -371,7 +320,6 @@ onMounted(async () => {
   if (props.tabId && (previewScrollMemory.has(props.tabId) || tabTopLineMemory.has(props.tabId))) {
     restoreTabScroll(props.tabId);
   }
-  processPlantuml();
   attachImageOverlayHandlers();
   attachCodeCopyButtons();
   enableTaskCheckboxes();
@@ -811,33 +759,6 @@ defineExpose({ scrollToLine, openSearch });
   margin: 1.5em 0;
   cursor: zoom-in;
   transition: opacity 0.15s;
-}
-/* v4.10 #163 — PlantUML server-rendered diagrams. */
-:where(.preview-content) .plantuml-block {
-  display: flex;
-  justify-content: center;
-  margin: 1.5em 0;
-}
-:where(.preview-content) .plantuml-block img {
-  max-width: 100%;
-  height: auto;
-}
-:where(.preview-content) .plantuml-error {
-  color: var(--text-muted);
-  border-left: 3px solid var(--accent);
-  white-space: pre-wrap;
-}
-:where(.preview-content) .mermaid-block:hover {
-  opacity: 0.85;
-}
-:where(.preview-content) .mermaid-block svg {
-  max-width: 100%;
-  height: auto;
-}
-:where(.preview-content) .mermaid-error {
-  color: var(--danger);
-  background: rgba(214, 69, 69, 0.08);
-  border-left: 3px solid var(--danger);
 }
 /* F7 — static whiteboard thumbnail in preview/reading/export. */
 :where(.preview-content) .whiteboard-block {

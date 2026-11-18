@@ -106,7 +106,7 @@ async function openHit(hit: SearchHit) {
     await files.openPath(hit.file);
     nextTick(() => {
       window.dispatchEvent(
-        new CustomEvent('solomd:outline-goto', {
+        new CustomEvent('zeromd:outline-goto', {
           detail: { line: hit.line, paneId: tiles.focusedPaneId },
         }),
       );
